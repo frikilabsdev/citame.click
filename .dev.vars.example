@@ -1,0 +1,11 @@
+# Variables de entorno para desarrollo local
+# Copia este archivo a .dev.vars y completa con tus credenciales reales
+# 
+# Para obtener estas credenciales:
+# 1. Ve a tu cuenta de Mocha (https://getmocha.com)
+# 2. Navega a la configuración de tu proyecto
+# 3. Encuentra la sección de "Users Service" o "OAuth Configuration"
+# 4. Copia las credenciales aquí
+
+MOCHA_USERS_SERVICE_API_URL=https://api.getmocha.com
+MOCHA_USERS_SERVICE_API_KEY=tu_api_key_aqui

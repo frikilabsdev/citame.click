@@ -1,0 +1,47 @@
+## Citas
+
+Sistema de gestión de citas construido con Cloudflare Workers + React + TypeScript.
+
+### 🚀 Inicio Rápido (Localhost)
+
+1. **Instalar dependencias:**
+   ```bash
+   npm install
+   ```
+
+2. **Aplicar migraciones de base de datos (solo primera vez):**
+   ```bash
+   npx wrangler d1 migrations apply 019bcc5c-7e0e-7d85-ad58-b72f3439c49a --local
+   ```
+
+3. **Iniciar servidor de desarrollo:**
+   ```bash
+   npm run dev
+   ```
+
+4. **Abrir en el navegador:**
+   - Local: http://localhost:5173/
+   - Registrarse: http://localhost:5173/register
+   - Iniciar sesión: http://localhost:5173/login
+
+### 📦 Deployment a Cloudflare
+
+1. **Aplicar migraciones a producción:**
+   ```bash
+   npx wrangler d1 migrations apply 019bcc5c-7e0e-7d85-ad58-b72f3439c49a --remote
+   ```
+
+2. **Desplegar:**
+   ```bash
+   npm run build
+   npx wrangler deploy
+   ```
+
+### ✨ Características
+
+- ✅ Autenticación con email/contraseña
+- ✅ Gestión de negocios (tenants)
+- ✅ Servicios y horarios
+- ✅ Sistema de citas
+- ✅ Dashboard completo
+- ✅ API REST completa
