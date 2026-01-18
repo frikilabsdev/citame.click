@@ -134,6 +134,22 @@ const COLOR_PALETTES = [
       price_color: "#818cf8",
     },
   },
+  {
+    name: "Vintage",
+    description: "Tonalidades cálidas y elegantes",
+    colors: {
+      primary_color: "#8C7864",
+      secondary_color: "#B7A996",
+      accent_color: "#4E4034",
+      text_color: "#4E4034",
+      background_color: "#F5F2EC",
+      card_background_color: "#ffffff",
+      card_border_color: "#D9D2C6",
+      service_title_color: "#4E4034",
+      time_text_color: "#8C7864",
+      price_color: "#8C7864",
+    },
+  },
 ];
 
 // Función para comprimir imagen usando Canvas API
