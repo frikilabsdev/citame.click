@@ -8,6 +8,8 @@ interface ServiceDetailModalProps {
   service: Service | null;
   onSelectService: (service: Service) => void;
   customColors?: {
+    primary_color?: string;
+    secondary_color?: string;
     card_background_color?: string;
     card_border_color?: string;
     service_title_color?: string;
@@ -108,7 +110,12 @@ export default function ServiceDetailModal({
           <div className="relative w-full h-64 sm:h-80 bg-slate-100 rounded-t-2xl overflow-hidden">
             {isLoadingImages ? (
               <div className="w-full h-full flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div
+                  className="animate-spin rounded-full h-12 w-12 border-b-2"
+                  style={{
+                    borderTopColor: customColors?.primary_color || "#3b82f6",
+                  }}
+                ></div>
               </div>
             ) : currentImage ? (
               <img
@@ -222,7 +229,15 @@ export default function ServiceDetailModal({
                 onSelectService(service);
                 onClose();
               }}
-              className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-xl font-semibold shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 transition-all"
+              className="w-full px-6 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
+              style={{
+                background: customColors?.primary_color && customColors?.secondary_color
+                  ? `linear-gradient(135deg, ${customColors.primary_color} 0%, ${customColors.secondary_color} 100%)`
+                  : "linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)",
+                boxShadow: customColors?.primary_color
+                  ? `0 10px 15px -3px ${customColors.primary_color}30, 0 4px 6px -2px ${customColors.primary_color}20`
+                  : undefined,
+              }}
             >
               Seleccionar este Servicio
             </button>

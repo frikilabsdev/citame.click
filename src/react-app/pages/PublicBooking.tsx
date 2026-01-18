@@ -625,6 +625,8 @@ export default function PublicBookingPage() {
             setDetailModalService(null);
           }}
           customColors={custom ? {
+            primary_color: custom.primary_color || undefined,
+            secondary_color: custom.secondary_color || undefined,
             card_background_color: custom.card_background_color || undefined,
             card_border_color: custom.card_border_color || undefined,
             service_title_color: custom.service_title_color || undefined,
