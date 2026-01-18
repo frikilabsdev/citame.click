@@ -184,7 +184,6 @@ export default function ServiceModal({
 
     try {
       const serviceData: Partial<Service> = {
-        tenant_id: tenantId,
         title: formData.title,
         description: formData.description || null,
         price: formData.price ? parseFloat(formData.price) : null,
@@ -193,6 +192,11 @@ export default function ServiceModal({
         is_active: formData.is_active,
         main_image_url: mainImageUrl,
       };
+
+      // Only include tenant_id when creating a new service
+      if (!service) {
+        serviceData.tenant_id = tenantId;
+      }
 
       await onSave(serviceData);
 
