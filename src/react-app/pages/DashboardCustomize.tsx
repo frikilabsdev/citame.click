@@ -438,6 +438,22 @@ export default function DashboardCustomizePage() {
     }));
   };
 
+  // Función para verificar si una paleta coincide con los valores actuales del formulario
+  const isPaletteSelected = (palette: typeof COLOR_PALETTES[0]): boolean => {
+    return (
+      formData.primary_color === palette.colors.primary_color &&
+      formData.secondary_color === palette.colors.secondary_color &&
+      formData.accent_color === palette.colors.accent_color &&
+      formData.background_color === palette.colors.background_color &&
+      formData.card_background_color === palette.colors.card_background_color &&
+      formData.card_border_color === palette.colors.card_border_color &&
+      formData.service_title_color === palette.colors.service_title_color &&
+      formData.time_text_color === palette.colors.time_text_color &&
+      formData.price_color === palette.colors.price_color &&
+      formData.text_color === palette.colors.text_color
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -558,34 +574,70 @@ export default function DashboardCustomizePage() {
           Selecciona una paleta para aplicarla automáticamente a todos los elementos
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {COLOR_PALETTES.map((palette, index) => (
-            <button
-              key={index}
-              onClick={() => handlePaletteSelect(palette)}
-              className="p-4 rounded-xl border-2 border-slate-200 hover:border-blue-500 bg-white transition-all text-left group"
-            >
-              <div className="flex items-center space-x-3 mb-2">
-                <div className="flex space-x-1">
-                  <div
-                    className="w-6 h-6 rounded-full border border-slate-200"
-                    style={{ backgroundColor: palette.colors.primary_color }}
-                  />
-                  <div
-                    className="w-6 h-6 rounded-full border border-slate-200"
-                    style={{ backgroundColor: palette.colors.secondary_color }}
-                  />
-                  <div
-                    className="w-6 h-6 rounded-full border border-slate-200"
-                    style={{ backgroundColor: palette.colors.accent_color }}
-                  />
+          {COLOR_PALETTES.map((palette, index) => {
+            const isSelected = isPaletteSelected(palette);
+            const primaryColor = formData.primary_color || "#3b82f6";
+            
+            return (
+              <button
+                key={index}
+                onClick={() => handlePaletteSelect(palette)}
+                className={`p-4 rounded-xl border-2 transition-all text-left group relative overflow-hidden ${
+                  isSelected
+                    ? "bg-blue-50 shadow-lg"
+                    : "bg-white hover:bg-slate-50"
+                }`}
+                style={{
+                  borderColor: isSelected ? primaryColor : "#e2e8f0",
+                  borderWidth: isSelected ? "3px" : "2px",
+                }}
+              >
+                {/* Indicador de selección */}
+                {isSelected && (
+                  <div 
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center shadow-md"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    <CheckCircle className="w-4 h-4 text-white" />
+                  </div>
+                )}
+                
+                <div className="flex items-center space-x-3 mb-2">
+                  <div className="flex space-x-1">
+                    <div
+                      className="w-6 h-6 rounded-full border border-slate-200"
+                      style={{ backgroundColor: palette.colors.primary_color }}
+                    />
+                    <div
+                      className="w-6 h-6 rounded-full border border-slate-200"
+                      style={{ backgroundColor: palette.colors.secondary_color }}
+                    />
+                    <div
+                      className="w-6 h-6 rounded-full border border-slate-200"
+                      style={{ backgroundColor: palette.colors.accent_color }}
+                    />
+                  </div>
+                  <h4 
+                    className={`font-semibold transition-colors ${
+                      isSelected 
+                        ? "text-blue-700" 
+                        : "text-slate-900 group-hover:text-blue-600"
+                    }`}
+                  >
+                    {palette.name}
+                  </h4>
                 </div>
-                <h4 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">
-                  {palette.name}
-                </h4>
-              </div>
-              <p className="text-xs text-slate-600">{palette.description}</p>
-            </button>
-          ))}
+                <p className={`text-xs ${isSelected ? "text-blue-600" : "text-slate-600"}`}>
+                  {palette.description}
+                </p>
+                {isSelected && (
+                  <p className="text-xs mt-2 font-medium" style={{ color: primaryColor }}>
+                    ✓ Paleta activa
+                  </p>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
