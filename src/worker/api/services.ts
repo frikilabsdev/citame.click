@@ -23,7 +23,16 @@ const updateServiceSchema = z.object({
   price: z.number().nullable().optional(),
   duration_minutes: z.number().nullable().optional(),
   max_simultaneous_bookings: z.number().min(1).optional(),
-  is_active: z.boolean().optional(),
+  is_active: z.preprocess(
+    (val) => {
+      if (val === undefined || val === null) return undefined;
+      if (typeof val === "boolean") return val;
+      if (typeof val === "number") return val === 1;
+      if (typeof val === "string") return val === "true" || val === "1";
+      return Boolean(val);
+    },
+    z.boolean().optional()
+  ),
   main_image_url: z.preprocess(
     (val) => (val === "" || val === undefined ? null : val),
     z.string().nullable().optional()
