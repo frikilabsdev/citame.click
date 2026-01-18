@@ -83,12 +83,15 @@ app.post("/image", authMiddleware, async (c) => {
 });
 
 // Serve files from R2 (public endpoint)
-app.get("/files/:path(*)", async (c) => {
-  const filePath = c.req.param("path");
+app.get("/files/*", async (c) => {
+  // Get the full path after /files/
+  const fullPath = c.req.path;
+  const filePath = fullPath.replace("/api/upload/files/", "");
+
   if (!filePath) {
     return c.json({ error: "Ruta de archivo no proporcionada" }, 400);
   }
-  console.log(`[Upload API] GET /files/${filePath} - Intentando obtener archivo`);
+  console.log(`[Upload API] GET /files/* - Full path: ${fullPath}, File path: ${filePath}`);
 
   try {
     const object = await c.env.R2_BUCKET.get(filePath);
