@@ -715,7 +715,7 @@ export default function PublicBookingPage() {
                           className={`aspect-square flex items-center justify-center text-sm font-medium transition-all rounded-full ${
                             isAvailable
                               ? "hover:opacity-80 cursor-pointer"
-                              : "text-slate-300 cursor-not-allowed"
+                              : "text-slate-300 bg-slate-100 opacity-40 cursor-not-allowed line-through"
                           }`}
                           style={{
                             ...isSelectedStyle,
@@ -837,11 +837,11 @@ export default function PublicBookingPage() {
                             }}
                           >
                             <ChevronLeft className="w-4 h-4" />
-                            <span>Anterior</span>
+                            <span>Ant</span>
                           </button>
 
                           <span className="text-sm" style={{ color: custom?.text_color || "#6b7280" }}>
-                            Página {currentTimePage + 1} de {totalPages}
+                            pag {currentTimePage + 1} de {totalPages}
                           </span>
 
                           <button
@@ -853,7 +853,7 @@ export default function PublicBookingPage() {
                               color: currentTimePage === totalPages - 1 ? (custom?.text_color || "#6b7280") : primaryColor,
                             }}
                           >
-                            <span>Siguiente</span>
+                            <span>Sig</span>
                             <ChevronRight className="w-4 h-4" />
                           </button>
               </div>
