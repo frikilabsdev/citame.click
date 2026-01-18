@@ -190,7 +190,7 @@ export default function ServiceModal({
         duration_minutes: formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
         max_simultaneous_bookings: formData.max_simultaneous_bookings ? parseInt(formData.max_simultaneous_bookings) : 1,
         is_active: formData.is_active,
-        main_image_url: mainImageUrl,
+        main_image_url: mainImageUrl || null,
       };
 
       // Only include tenant_id when creating a new service

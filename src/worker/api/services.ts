@@ -24,7 +24,10 @@ const updateServiceSchema = z.object({
   duration_minutes: z.number().nullable().optional(),
   max_simultaneous_bookings: z.number().min(1).optional(),
   is_active: z.boolean().optional(),
-  main_image_url: z.string().nullable().optional(),
+  main_image_url: z.union([
+    z.string(), 
+    z.null()
+  ]).transform((val) => (val === "" || !val) ? null : val).optional(),
 });
 
 // Helper to verify tenant ownership
@@ -205,7 +208,8 @@ servicesApi.put(
     }
     if (data.main_image_url !== undefined) {
       updates.push("main_image_url = ?");
-      values.push(data.main_image_url || null);
+      // Handle empty string, null, or valid URL
+      values.push(data.main_image_url === "" || !data.main_image_url ? null : data.main_image_url);
     }
 
     updates.push("updated_at = datetime('now')");
