@@ -14,21 +14,21 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "019bcc5c-7e0e-7d85-ad58-b72f3439c49a",
-      "database_id": "019bcc5c-7e0e-7d85-ad58-b72f3439c49a"
+      "database_name": "mocha-appointments-db",
+      "database_id": "7379435b-efa7-4234-89d0-f9a902adc765"
     }
   ],
   "r2_buckets": [
     {
       "binding": "R2_BUCKET",
-      "bucket_name": "019bcc5c-7e0e-7d85-ad58-b72f3439c49a"
+      "bucket_name": "mocha-appointments-images"
     }
   ],
   "kv_namespaces": [
     {
       "binding": "SESSIONS_KV",
-      "id": "TU_ID_DE_PRODUCCION_AQUI",
-      "preview_id": "TU_ID_DE_PREVIEW_AQUI"
+      "id": "606705dfbd25488583b30642b3354749",
+      "preview_id": "860f02bfc53941e3aa65c2a2ab2999e9"
     }
   ]
 }
