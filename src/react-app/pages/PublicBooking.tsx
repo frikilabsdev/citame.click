@@ -1135,7 +1135,10 @@ export default function PublicBookingPage() {
               {/* Payment Method Selection */}
               {paymentMethods.length > 0 && (
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  <label 
+                    className="block text-sm font-semibold mb-2"
+                    style={{ color: custom?.text_color || "#374151" }}
+                  >
                     Método de pago *
                   </label>
                   <select
@@ -1152,7 +1155,20 @@ export default function PublicBookingPage() {
                         setSelectedPaymentMethod(method || null);
                       }
                     }}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                    className="w-full px-4 py-3 rounded-xl border outline-none transition-all"
+                    style={{
+                      borderColor: custom?.card_border_color || "#d1d5db",
+                      backgroundColor: custom?.card_background_color || "#ffffff",
+                      color: custom?.text_color || "#111827",
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = primaryColor;
+                      e.currentTarget.style.boxShadow = `0 0 0 3px ${primaryColor}20`;
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = custom?.card_border_color || "#d1d5db";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
                   >
                     <option value="">-- Selecciona un método de pago --</option>
                     {paymentMethods.map((method) => (
