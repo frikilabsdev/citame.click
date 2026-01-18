@@ -78,7 +78,11 @@ export default function DashboardServicesPage() {
     });
 
     if (!response.ok) {
-      throw new Error("Error al actualizar servicio");
+      const errorData = await response.json().catch(() => ({ error: "Error desconocido" }));
+      const errorMessage = errorData.details 
+        ? `Error de validación: ${errorData.details.map((d: any) => d.message).join(", ")}`
+        : errorData.error || "Error al actualizar servicio";
+      throw new Error(errorMessage);
     }
 
     await fetchServices();

@@ -24,10 +24,10 @@ const updateServiceSchema = z.object({
   duration_minutes: z.number().nullable().optional(),
   max_simultaneous_bookings: z.number().min(1).optional(),
   is_active: z.boolean().optional(),
-  main_image_url: z.union([
-    z.string(), 
-    z.null()
-  ]).transform((val) => (val === "" || !val) ? null : val).optional(),
+  main_image_url: z.preprocess(
+    (val) => (val === "" || val === undefined ? null : val),
+    z.string().nullable().optional()
+  ),
 });
 
 // Helper to verify tenant ownership
@@ -153,15 +153,34 @@ servicesApi.post(
 servicesApi.put(
   "/:id",
   authMiddleware,
-  zValidator("json", updateServiceSchema),
-  async (c) => {
-    const user = c.get("user");
-    if (!user) {
-      return c.json({ error: "No autenticado" }, 401);
+  zValidator("json", updateServiceSchema, (result, c) => {
+    if (!result.success) {
+      const errorDetails = result.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      }));
+      return c.json(
+        {
+          error: "Error de validación",
+          details: errorDetails,
+        },
+        400
+      );
     }
+  }),
+  async (c) => {
+    try {
+      const user = c.get("user");
+      if (!user) {
+        return c.json({ error: "No autenticado" }, 401);
+      }
 
-    const serviceId = parseInt(c.req.param("id"));
-    const data = c.req.valid("json");
+      const serviceId = parseInt(c.req.param("id"));
+      if (isNaN(serviceId)) {
+        return c.json({ error: "ID de servicio inválido" }, 400);
+      }
+      
+      const data = c.req.valid("json");
 
     // Check ownership
     const service = await c.env.DB.prepare(
@@ -221,13 +240,23 @@ servicesApi.put(
       .bind(...values)
       .run();
 
-    const updated = await c.env.DB.prepare(
-      "SELECT * FROM services WHERE id = ?"
-    )
-      .bind(serviceId)
-      .first();
+      const updated = await c.env.DB.prepare(
+        "SELECT * FROM services WHERE id = ?"
+      )
+        .bind(serviceId)
+        .first();
 
-    return c.json(updated);
+      return c.json(updated);
+    } catch (error: any) {
+      console.error("Error actualizando servicio:", error);
+      return c.json(
+        {
+          error: "Error al actualizar servicio",
+          message: error.message || "Error desconocido",
+        },
+        500
+      );
+    }
   }
 );
 

@@ -208,9 +208,10 @@ export default function ServiceModal({
       }
 
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al guardar servicio:", error);
-      alert("Error al guardar el servicio. Por favor intenta de nuevo.");
+      const errorMessage = error.message || "Error al guardar el servicio. Por favor intenta de nuevo.";
+      alert(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
