@@ -1037,6 +1037,18 @@ export default function PublicBookingPage() {
             </h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Estilos dinámicos para placeholders y selects */}
+              <style>{`
+                input::placeholder,
+                textarea::placeholder {
+                  color: ${custom?.text_color ? `${custom.text_color}99` : "#6b7280"} !important;
+                  opacity: 0.7 !important;
+                }
+                select option {
+                  background-color: ${custom?.card_background_color || "#ffffff"} !important;
+                  color: ${custom?.text_color || "#111827"} !important;
+                }
+              `}</style>
               <div>
                 <label 
                   className="block text-sm font-semibold mb-2"
