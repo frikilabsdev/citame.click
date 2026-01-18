@@ -189,7 +189,7 @@ export default function ServiceModal({
         description: formData.description || null,
         price: formData.price ? parseFloat(formData.price) : null,
         duration_minutes: formData.duration_minutes ? parseInt(formData.duration_minutes) : null,
-        max_simultaneous_bookings: parseInt(formData.max_simultaneous_bookings),
+        max_simultaneous_bookings: formData.max_simultaneous_bookings ? parseInt(formData.max_simultaneous_bookings) : 1,
         is_active: formData.is_active,
         main_image_url: mainImageUrl,
       };
