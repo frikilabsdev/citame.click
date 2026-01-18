@@ -519,21 +519,7 @@ app.post("/appointments", async (c) => {
       paymentMethodText = methodMap[body.payment_method] || body.payment_method;
     }
 
-    // Construct WhatsApp message
-    let message = `¡Hola ${businessConfig.business_name || "negocio"}! He reservado una cita desde su app. Estos son mis datos de reserva.\n\n`;
-    message += `Nombre: ${body.customer_name}\n`;
-    message += `Servicio: ${service.title}\n`;
-    if (service.price) {
-      message += `Costo: $${service.price.toFixed(2)}\n`;
-    }
-    message += `Fecha: ${formattedDate}\n`;
-    message += `Hora: ${time}\n`;
-    if (paymentMethodText) {
-      message += `Metodo de pago: ${paymentMethodText}\n`;
-    }
-    message += `\nPor favor, podrías confirmar mi cita. Gracias!!`;
-
-    // Generate ICS file URL
+    // Generate ICS file URL first (needed for the message)
     const [hour, minute] = time.split(":").map(Number);
     const startDate = new Date(dateObj);
     startDate.setHours(hour, minute, 0, 0);
@@ -546,7 +532,19 @@ app.post("/appointments", async (c) => {
     const baseUrl = `${proto}://${host}`;
     icsUrl = `${baseUrl}/api/public/appointments/${result.meta.last_row_id}/ics`;
 
-    message += `\n\nGuardar cita en calendario: ${icsUrl}`;
+    // Construct WhatsApp message
+    let message = `¡Hola ${businessConfig.business_name || "negocio"}! He reservado una cita desde su app. Estos son mis datos de reserva.\n\n`;
+    message += `Nombre: ${body.customer_name}\n`;
+    message += `Servicio: ${service.title}\n`;
+    if (service.price) {
+      message += `Costo: $${service.price.toFixed(2)}\n`;
+    }
+    message += `Fecha: ${icsUrl} ${formattedDate} a las ${time}\n`;
+    message += `*(click arriba para guardar en tu calendario)*\n`;
+    if (paymentMethodText) {
+      message += `Metodo de pago: ${paymentMethodText}\n`;
+    }
+    message += `\nPor favor, podrías confirmar mi cita. Gracias!!`;
 
     const encodedMessage = encodeURIComponent(message);
     whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;

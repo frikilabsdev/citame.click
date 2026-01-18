@@ -32,6 +32,7 @@ export default function PublicBookingPage() {
   const [selectedDate, setSelectedDate] = useState("");
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState("");
+  const [currentTimePage, setCurrentTimePage] = useState(0);
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [isLoadingDates, setIsLoadingDates] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -68,6 +69,7 @@ export default function PublicBookingPage() {
       fetchAvailableDates();
       setSelectedDate("");
       setSelectedTime("");
+      setCurrentTimePage(0);
       setAvailableSlots([]);
       setCurrentMonth(new Date());
     }
@@ -79,6 +81,7 @@ export default function PublicBookingPage() {
     } else {
       setAvailableSlots([]);
       setSelectedTime("");
+      setCurrentTimePage(0);
     }
   }, [selectedService, selectedDate]);
 
@@ -155,6 +158,7 @@ export default function PublicBookingPage() {
       if (response.ok) {
         const data = await response.json();
         setAvailableSlots(data);
+        setCurrentTimePage(0); // Resetear a la primera página cuando cambian los slots
       }
     } catch (error) {
       console.error("Error al cargar horarios:", error);
@@ -193,10 +197,10 @@ export default function PublicBookingPage() {
         // Open WhatsApp automatically if URL is provided
         if (data.whatsapp_url) {
           setWhatsappUrl(data.whatsapp_url);
-          // Open WhatsApp in a new window after 2 seconds
+          // Open WhatsApp in a new window after 1.5 seconds
           setTimeout(() => {
             window.open(data.whatsapp_url, "_blank");
-          }, 2000);
+          }, 1500);
         }
       } else {
         const errorData = await response.json();
@@ -541,9 +545,9 @@ export default function PublicBookingPage() {
                       </div>
                     )}
                       </div>
-                      {service.price && (
+                    {service.price && (
                         <div className="font-bold text-lg" style={{ color: custom?.price_color || "#059669" }}>
-                          ${service.price.toFixed(2)}
+                        ${service.price.toFixed(2)}
                       </div>
                     )}
                     </div>
@@ -776,38 +780,88 @@ export default function PublicBookingPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                {availableSlots.map((time) => {
+              <>
+                {/* Paginación de slots: 16 por página (4x4) */}
+                {(() => {
+                  const SLOTS_PER_PAGE = 16; // 4 filas x 4 columnas
+                  const totalPages = Math.ceil(availableSlots.length / SLOTS_PER_PAGE);
+                  const startIndex = currentTimePage * SLOTS_PER_PAGE;
+                  const endIndex = startIndex + SLOTS_PER_PAGE;
+                  const currentSlots = availableSlots.slice(startIndex, endIndex);
                   const primaryColor = custom?.primary_color || "#3b82f6";
-                  const isSelected = time === selectedTime;
+
                   return (
+                    <>
+                      <div className="grid grid-cols-4 gap-3 mb-4">
+                        {currentSlots.map((time) => {
+                          const isSelected = time === selectedTime;
+                          return (
                   <button
                     key={time}
                     onClick={() => setSelectedTime(time)}
-                    className="p-3 rounded-xl border-2 transition-all text-center font-semibold"
-                    style={{
-                      borderColor: isSelected ? primaryColor : (custom?.card_border_color || "#e5e7eb"),
-                      backgroundColor: isSelected ? `${primaryColor}15` : "transparent",
-                      color: isSelected ? primaryColor : (custom?.text_color || "#111827"),
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.borderColor = primaryColor;
-                        e.currentTarget.style.backgroundColor = `${primaryColor}10`;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.borderColor = custom?.card_border_color || "#e5e7eb";
-                        e.currentTarget.style.backgroundColor = "transparent";
-                      }
-                    }}
+                              className="p-3 rounded-xl border-2 transition-all text-center font-semibold"
+                              style={{
+                                borderColor: isSelected ? primaryColor : (custom?.card_border_color || "#e5e7eb"),
+                                backgroundColor: isSelected ? `${primaryColor}15` : "transparent",
+                                color: isSelected ? primaryColor : (custom?.text_color || "#111827"),
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.borderColor = primaryColor;
+                                  e.currentTarget.style.backgroundColor = `${primaryColor}10`;
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!isSelected) {
+                                  e.currentTarget.style.borderColor = custom?.card_border_color || "#e5e7eb";
+                                  e.currentTarget.style.backgroundColor = "transparent";
+                                }
+                              }}
                   >
                     {time}
                   </button>
-                  );
-                })}
+                          );
+                        })}
+                      </div>
+
+                      {/* Navegación de páginas */}
+                      {totalPages > 1 && (
+                        <div className="flex items-center justify-between pt-4 border-t" style={{ borderColor: custom?.card_border_color || "#e5e7eb" }}>
+                          <button
+                            onClick={() => setCurrentTimePage(Math.max(0, currentTimePage - 1))}
+                            disabled={currentTimePage === 0}
+                            className="flex items-center space-x-2 px-4 py-2 rounded-lg border transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                              borderColor: currentTimePage === 0 ? (custom?.card_border_color || "#e5e7eb") : primaryColor,
+                              color: currentTimePage === 0 ? (custom?.text_color || "#6b7280") : primaryColor,
+                            }}
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                            <span>Anterior</span>
+                          </button>
+
+                          <span className="text-sm" style={{ color: custom?.text_color || "#6b7280" }}>
+                            Página {currentTimePage + 1} de {totalPages}
+                          </span>
+
+                          <button
+                            onClick={() => setCurrentTimePage(Math.min(totalPages - 1, currentTimePage + 1))}
+                            disabled={currentTimePage === totalPages - 1}
+                            className="flex items-center space-x-2 px-4 py-2 rounded-lg border transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                              borderColor: currentTimePage === totalPages - 1 ? (custom?.card_border_color || "#e5e7eb") : primaryColor,
+                              color: currentTimePage === totalPages - 1 ? (custom?.text_color || "#6b7280") : primaryColor,
+                            }}
+                          >
+                            <span>Siguiente</span>
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
               </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </>
             )}
           </div>
         )}
