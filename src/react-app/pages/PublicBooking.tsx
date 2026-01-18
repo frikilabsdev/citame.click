@@ -793,9 +793,18 @@ export default function PublicBookingPage() {
                       const isToday = date === today.toISOString().split("T")[0];
                       
                 const primaryColor = custom?.primary_color || "#3b82f6";
-                const isSelectedStyle = isSelected ? { backgroundColor: primaryColor, color: "#ffffff" } : {};
-                const isTodayStyle = isToday && !isSelected ? { backgroundColor: `${primaryColor}20`, color: primaryColor } : {};
-                const defaultStyle = !isSelected && !isToday ? { color: custom?.text_color || "#374151" } : {};
+                const textColor = custom?.text_color || "#374151";
+                const isSelectedStyle = isSelected ? { backgroundColor: primaryColor, color: "#ffffff", border: "none" } : {};
+                // Para "hoy": solo borde, sin fondo, y el texto usa el color de texto normal
+                const isTodayStyle = isToday && !isSelected ? { 
+                  border: `2px solid ${primaryColor}`, 
+                  backgroundColor: "transparent",
+                  color: textColor 
+                } : {};
+                const defaultStyle = !isSelected && !isToday ? { 
+                  color: textColor,
+                  border: "none"
+                } : {};
                 
                 return (
                   <button
