@@ -518,12 +518,6 @@ app.post("/appointments", async (c) => {
       paymentMethodText = methodMap[body.payment_method] || body.payment_method;
     }
 
-    // Generate ICS file URL for calendar download
-    const proto = c.req.header("x-forwarded-proto") || (c.req.url.startsWith("https") ? "https" : "http");
-    const host = c.req.header("host") || (c.req.url.match(/\/\/([^\/]+)/)?.[1] || "localhost");
-    const baseUrl = `${proto}://${host}`;
-    icsUrl = `${baseUrl}/api/public/appointments/${result.meta.last_row_id}/ics`;
-
     // Construct WhatsApp message
     let message = `¡Hola ${businessConfig.business_name || "negocio"}! He reservado una cita desde su app. Estos son mis datos de reserva.\n\n`;
     message += `Nombre: ${body.customer_name}\n`;
