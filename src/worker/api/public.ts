@@ -539,8 +539,7 @@ app.post("/appointments", async (c) => {
     if (service.price) {
       message += `Costo: $${service.price.toFixed(2)}\n`;
     }
-    message += `Fecha: ${icsUrl} ${formattedDate} a las ${time}\n`;
-    message += `*(click arriba para guardar en tu calendario)*\n`;
+    message += `Fecha: ${formattedDate} a las ${time}\n`;
     if (paymentMethodText) {
       message += `Metodo de pago: ${paymentMethodText}\n`;
     }
