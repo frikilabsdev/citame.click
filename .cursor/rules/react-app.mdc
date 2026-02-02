@@ -1,0 +1,25 @@
+---
+description: Convenciones para el frontend React
+globs: src/react-app/**/*.ts, src/react-app/**/*.tsx
+alwaysApply: false
+---
+
+# React App
+
+## Contexto
+
+- **React 19**, **React Router 7** (BrowserRouter, Routes, Route).
+- **Auth:** AuthContext (`useAuth()`) para user, login, logout, loading.
+- Alias de imports: `@/` apunta a `src/` (ej. `@/react-app/pages/Home`).
+- Estilos: **Tailwind**; iconos **lucide-react**.
+
+## Rutas
+
+- Definidas en `App.tsx`: `/`, `/login`, `/register`, `/:slug` (PublicBooking), `/dashboard` (layout con hijos).
+- Hijos del dashboard en `App.tsx`: index, services, schedules, appointments, settings. Customize, Payments, Social existen como páginas pero no están en rutas ni en el menú de DashboardLayout; si se exponen, añadir Route y enlace en el nav.
+
+## Patrones
+
+- Páginas protegidas: comprobar `user` desde `useAuth()` y redirigir a login si no hay sesión (o usar un wrapper de ruta protegida).
+- Llamadas API: fetch a rutas `/api/*` con `credentials: "include"` para enviar la cookie de sesión.
+- Formularios y mensajes al usuario en **español**.

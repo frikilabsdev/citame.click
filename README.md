@@ -2,6 +2,8 @@
 
 Sistema de gestión de citas construido con Cloudflare Workers + React + TypeScript.
 
+**Documentación completa:** [docs/README.md](docs/README.md)
+
 ### 🚀 Inicio Rápido (Localhost)
 
 1. **Instalar dependencias:**

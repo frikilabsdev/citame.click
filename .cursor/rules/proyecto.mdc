@@ -1,0 +1,28 @@
+---
+description: Stack, estructura y convenciones del proyecto citame.click
+alwaysApply: true
+---
+
+# Proyecto citame.click
+
+## Stack
+
+- **Runtime:** Cloudflare Workers (Hono), compat_date 2025-06-17, nodejs_compat
+- **Frontend:** React 19, Vite 7, React Router 7, Tailwind, lucide-react
+- **Build:** @cloudflare/vite-plugin + @getmocha/vite-plugins (auth Mocha)
+- **Base de datos:** D1 (SQLite), binding `DB`
+- **Storage:** R2 (`R2_BUCKET`), KV (`SESSIONS_KV`) para sesiones
+- **Auth:** @getmocha/users-service (externo), sesiones en KV
+
+## Estructura
+
+- `src/worker/` — API Hono: index.ts (CORS, health, errores, rutas), api/*.ts, utils/
+- `src/react-app/` — UI: App.tsx, contexts/AuthContext, pages/, components/
+- `src/shared/types.ts` — Tipos compartidos (Tenant, Service, Appointment, etc.)
+- `migrations/` — SQL en orden 1–5; no romper compatibilidad D1
+
+## Convenciones
+
+- UI y mensajes al usuario en **español**.
+- No modificar IDs de wrangler.json (database_id, KV id, etc.) sin documentar el cambio.
+- Rutas dashboard en menú: services, schedules, appointments, settings. Las páginas Customize, Payments y Social existen pero no están enlazadas en DashboardLayout; si se añaden, actualizar el menú y App.tsx.

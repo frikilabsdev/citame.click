@@ -1,0 +1,18 @@
+---
+description: Tipos TypeScript y esquema D1 (migraciones)
+globs: src/shared/**/*.ts, migrations/**/*.sql
+alwaysApply: false
+---
+
+# Tipos y esquema
+
+## Tipos
+
+- Definidos en `src/shared/types.ts`: Tenant, BusinessConfig, Service, ServiceImage, SocialNetwork, PaymentMethod, AvailabilitySchedule, ScheduleException, Appointment, VisualCustomization.
+- Mantener tipos alineados con el esquema D1; si se añade una columna en una migración, actualizar el tipo correspondiente.
+
+## Migraciones
+
+- Orden: 1.sql → 2.sql → 3.sql → 4.sql → 5.sql. No reordenar ni modificar migraciones ya aplicadas en producción.
+- Nuevas migraciones: añadir en el siguiente número; probar con `wrangler d1 migrations apply ... --local` antes de --remote.
+- Tablas principales: users, tenants, business_configs, services, service_images, social_networks, payment_methods, availability_schedules, schedule_exceptions, appointments, visual_customizations. Relaciones por tenant_id y service_id según docs/modelo-datos.md.

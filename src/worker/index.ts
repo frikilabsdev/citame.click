@@ -39,29 +39,21 @@ app.use("*", async (c, next) => {
 });
 
 // CORS configuration
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:5173",
+  "https://citame.click",
+  "https://www.citame.click",
+];
+
 app.use(
   "*",
   cors({
     origin: (origin) => {
-      // In production, replace with your actual domain
-      // For development, allow localhost
       if (!origin) return "*"; // Allow requests without origin (e.g., Postman)
-      
-      const allowedOrigins = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:5173",
-        // Add your production domain here
-        // "https://yourdomain.com",
-      ];
-      
-      if (allowedOrigins.includes(origin)) {
-        return origin;
-      }
-      
-      // In production, return null to deny unknown origins
-      // For now, allow all origins (change in production)
-      return origin;
+      if (ALLOWED_ORIGINS.includes(origin)) return origin;
+      return null; // Deny unknown origins (production security)
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],

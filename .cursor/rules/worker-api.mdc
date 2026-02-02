@@ -1,0 +1,22 @@
+---
+description: Convenciones para el Worker y APIs Hono
+globs: src/worker/**/*.ts
+alwaysApply: false
+---
+
+# Worker y API
+
+## Contexto
+
+- Hono monta rutas bajo `/api/*`; auth con middleware que usa `c.get("user")` (id, email).
+- Todas las APIs de negocio validan **tenant ownership**: el usuario solo accede a recursos de sus tenants (tenant_id).
+- Validación de entrada con **Zod** y `zValidator("json", schema)`.
+- Logging con `logger` de `@/worker/utils/logger`; no usar console en producción para errores sensibles.
+- Endpoints **públicos** (`/api/public/*`, `/api/auth/register`, `/api/auth/login`, crear cita pública) pueden usar **rate-limit** (checkRateLimit desde `@/worker/utils/rate-limit`).
+
+## Patrones
+
+- Obtener usuario: `const user = c.get("user")` (tras authMiddleware).
+- Obtener tenant_id para ownership: desde query/param o desde recurso cargado (ej. servicio pertenece a tenant_id X).
+- Respuestas: `c.json({ ... })` con códigos 200, 201, 400, 401, 403, 404, 429, 500.
+- Bindings: `c.env.DB`, `c.env.R2_BUCKET`, `c.env.SESSIONS_KV`; tipos en worker/types.d.ts (Env).
