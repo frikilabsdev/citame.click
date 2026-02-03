@@ -3,6 +3,7 @@ import { authMiddleware } from "@/worker/api/auth";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import type { Employee, EmployeeSchedule, EmployeeTimeOff } from "@/shared/types";
+import { logger } from "@/worker/utils/logger";
 
 const app = new Hono<{ Bindings: Env; Variables: HonoContextVariables }>();
 
@@ -64,17 +65,19 @@ const createTimeOffSchema = z.object({
 
 // GET /api/employees?tenant_id=X
 app.get("/", authMiddleware, async (c) => {
-  const user = c.get("user");
-  if (!user) return c.json({ error: "No autenticado" }, 401);
-
-  const tenantIdParam = c.req.query("tenant_id");
-  if (!tenantIdParam) return c.json({ error: "tenant_id es requerido" }, 400);
-
-  const tenantId = parseInt(tenantIdParam);
-  const hasAccess = await verifyTenantOwnership(c.env.DB, user.id, tenantId);
-  if (!hasAccess) return c.json({ error: "No tienes acceso a este negocio" }, 403);
-
   try {
+    const user = c.get("user");
+    if (!user) return c.json({ error: "No autenticado" }, 401);
+
+    const tenantIdParam = c.req.query("tenant_id");
+    if (!tenantIdParam) return c.json({ error: "tenant_id es requerido" }, 400);
+
+    const tenantId = parseInt(tenantIdParam);
+    if (isNaN(tenantId)) return c.json({ error: "tenant_id inválido" }, 400);
+
+    const hasAccess = await verifyTenantOwnership(c.env.DB, user.id, tenantId);
+    if (!hasAccess) return c.json({ error: "No tienes acceso a este negocio" }, 403);
+
     const { results: employees } = await c.env.DB.prepare(
       "SELECT * FROM employees WHERE tenant_id = ? ORDER BY display_order ASC, name ASC"
     )
@@ -107,8 +110,23 @@ app.get("/", authMiddleware, async (c) => {
     }));
 
     return c.json(list);
-  } catch {
-    return c.json([]);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const isMissingTable =
+      /no such table:\s*employees/i.test(msg) ||
+      /no such table:\s*employee_/i.test(msg);
+    if (isMissingTable) {
+      logger.warn("GET /api/employees: tablas de empleados no existen, devolviendo lista vacía", {
+        message: msg,
+      });
+      return c.json([]);
+    }
+    logger.error("GET /api/employees", err, { path: c.req.path });
+    const isDev = c.req.url.includes("localhost") || c.req.url.includes("127.0.0.1");
+    return c.json(
+      { error: "Error al cargar empleados", ...(isDev && { message: msg }) },
+      500
+    );
   }
 });
 
@@ -118,15 +136,15 @@ app.post(
   authMiddleware,
   zValidator("json", createEmployeeSchema),
   async (c) => {
-    const user = c.get("user");
-    if (!user) return c.json({ error: "No autenticado" }, 401);
-
-    const data = c.req.valid("json");
-    const hasAccess = await verifyTenantOwnership(c.env.DB, user.id, data.tenant_id);
-    if (!hasAccess) return c.json({ error: "No tienes acceso a este negocio" }, 403);
-
     try {
-      await c.env.DB.prepare(
+      const user = c.get("user");
+      if (!user) return c.json({ error: "No autenticado" }, 401);
+
+      const data = c.req.valid("json");
+      const hasAccess = await verifyTenantOwnership(c.env.DB, user.id, data.tenant_id);
+      if (!hasAccess) return c.json({ error: "No tienes acceso a este negocio" }, 403);
+
+      const result = await c.env.DB.prepare(
         `INSERT INTO employees (tenant_id, name, phone, email, is_active, display_order, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
       )
@@ -140,13 +158,25 @@ app.post(
         )
         .run();
 
-      const row = await c.env.DB.prepare(
-        "SELECT * FROM employees WHERE id = (SELECT last_insert_rowid())"
-      ).first<Employee>();
+      const id = result.meta?.last_row_id;
+      if (id == null) {
+        logger.warn("POST /api/employees: INSERT ok but no last_row_id", {});
+        return c.json({ error: "Error al crear empleado" }, 500);
+      }
 
-      return c.json(row, 201);
+      const row = await c.env.DB.prepare("SELECT * FROM employees WHERE id = ?")
+        .bind(id)
+        .first<Employee>();
+
+      return c.json(row ?? { id, ...data }, 201);
     } catch (err) {
-      return c.json({ error: "Error al crear empleado" }, 500);
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error("POST /api/employees", err, { path: c.req.path });
+      const isDev = c.req.url.includes("localhost") || c.req.url.includes("127.0.0.1");
+      return c.json(
+        { error: "Error al crear empleado", ...(isDev && { message: msg }) },
+        500
+      );
     }
   }
 );
@@ -343,17 +373,18 @@ app.post(
 
     const data = c.req.valid("json");
     try {
-      await c.env.DB.prepare(
+      const result = await c.env.DB.prepare(
         `INSERT INTO employee_schedules (employee_id, day_of_week, start_time, end_time, is_active, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))`
       )
         .bind(id, data.day_of_week, data.start_time, data.end_time, data.is_active ? 1 : 0)
         .run();
 
-      const row = await c.env.DB.prepare(
-        "SELECT * FROM employee_schedules WHERE id = (SELECT last_insert_rowid())"
-      ).first<EmployeeSchedule>();
-      return c.json(row, 201);
+      const rowId = result.meta?.last_row_id;
+      const row = rowId != null
+        ? await c.env.DB.prepare("SELECT * FROM employee_schedules WHERE id = ?").bind(rowId).first<EmployeeSchedule>()
+        : null;
+      return c.json(row ?? { id: rowId, employee_id: id, ...data }, 201);
     } catch {
       return c.json({ error: "Error al crear horario" }, 500);
     }
@@ -422,17 +453,18 @@ app.post(
     }
 
     try {
-      await c.env.DB.prepare(
+      const result = await c.env.DB.prepare(
         `INSERT INTO employee_time_off (employee_id, date_from, date_to, reason, created_at, updated_at)
          VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))`
       )
         .bind(id, data.date_from, data.date_to, data.reason ?? null)
         .run();
 
-      const row = await c.env.DB.prepare(
-        "SELECT * FROM employee_time_off WHERE id = (SELECT last_insert_rowid())"
-      ).first<EmployeeTimeOff>();
-      return c.json(row, 201);
+      const rowId = result.meta?.last_row_id;
+      const row = rowId != null
+        ? await c.env.DB.prepare("SELECT * FROM employee_time_off WHERE id = ?").bind(rowId).first<EmployeeTimeOff>()
+        : null;
+      return c.json(row ?? { id: rowId, employee_id: id, ...data }, 201);
     } catch {
       return c.json({ error: "Error al registrar ausencia" }, 500);
     }
