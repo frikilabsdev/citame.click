@@ -13,7 +13,7 @@ Sistema de gestión de citas construido con Cloudflare Workers + React + TypeScr
 
 2. **Aplicar migraciones de base de datos (solo primera vez):**
    ```bash
-   npx wrangler d1 migrations apply 019bcc5c-7e0e-7d85-ad58-b72f3439c49a --local
+   npx wrangler d1 migrations apply mocha-appointments-db --local
    ```
 
 3. **Iniciar servidor de desarrollo:**
@@ -30,7 +30,7 @@ Sistema de gestión de citas construido con Cloudflare Workers + React + TypeScr
 
 1. **Aplicar migraciones a producción:**
    ```bash
-   npx wrangler d1 migrations apply 019bcc5c-7e0e-7d85-ad58-b72f3439c49a --remote
+   npx wrangler d1 migrations apply mocha-appointments-db --remote
    ```
 
 2. **Desplegar:**

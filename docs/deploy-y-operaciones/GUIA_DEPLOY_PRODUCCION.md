@@ -130,8 +130,8 @@ El proyecto está **listo para producción** con:
    "d1_databases": [
      {
        "binding": "DB",
-       "database_name": "019bcc5c-7e0e-7d85-ad58-b72f3439c49a",
-       "database_id": "019bcc5c-7e0e-7d85-ad58-b72f3439c49a"
+       "database_name": "mocha-appointments-db",
+       "database_id": "<tu-database-id-de-cloudflare>"
      }
    ]
    ```
@@ -153,19 +153,19 @@ El proyecto está **listo para producción** con:
 
 1. **Verifica las migraciones locales primero:**
    ```bash
-   npx wrangler d1 migrations list 019bcc5c-7e0e-7d85-ad58-b72f3439c49a --local
+   npx wrangler d1 migrations list mocha-appointments-db --local
    ```
 
 2. **Aplica migraciones a producción:**
    ```bash
-   npx wrangler d1 migrations apply 019bcc5c-7e0e-7d85-ad58-b72f3439c49a --remote
+   npx wrangler d1 migrations apply mocha-appointments-db --remote
    ```
 
 3. Te preguntará confirmación - escribe `y` y presiona Enter
 
 4. Verifica que todas las migraciones se aplicaron:
    ```bash
-   npx wrangler d1 migrations list 019bcc5c-7e0e-7d85-ad58-b72f3439c49a --remote
+   npx wrangler d1 migrations list mocha-appointments-db --remote
    ```
 
 ---
@@ -181,7 +181,7 @@ El proyecto está **listo para producción** con:
    "r2_buckets": [
      {
        "binding": "R2_BUCKET",
-       "bucket_name": "019bcc5c-7e0e-7d85-ad58-b72f3439c49a"
+       "bucket_name": "mocha-appointments-images"
      }
    ]
    ```

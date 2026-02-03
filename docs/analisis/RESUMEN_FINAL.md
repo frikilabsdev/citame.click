@@ -48,7 +48,7 @@ Editar `src/worker/index.ts` línea ~50:
 ### Paso 3: Aplicar Migraciones (2 minutos)
 
 ```bash
-npx wrangler d1 migrations apply 019bcc5c-7e0e-7d85-ad58-b72f3439c49a --remote
+npx wrangler d1 migrations apply mocha-appointments-db --remote
 ```
 
 ### Paso 4: Deploy (2 minutos)

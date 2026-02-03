@@ -29,7 +29,7 @@ Usa este checklist para asegurarte de que todo está listo antes de hacer deploy
 
 - [ ] **Migraciones:** Aplicar a producción
   ```bash
-  npx wrangler d1 migrations apply 019bcc5c-7e0e-7d85-ad58-b72f3439c49a --remote
+  npx wrangler d1 migrations apply mocha-appointments-db --remote
   ```
 
 - [ ] **Deploy:** Subir a Cloudflare

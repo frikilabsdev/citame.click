@@ -31,10 +31,10 @@
 Aplicar migraciones solo la primera vez (o tras cambios en migraciones):
 
 ```bash
-npx wrangler d1 migrations apply 019bcc5c-7e0e-7d85-ad58-b72f3439c49a --local
+npx wrangler d1 migrations apply mocha-appointments-db --local
 ```
 
-El ID `019bcc5c-7e0e-7d85-ad58-b72f3439c49a` es el nombre del worker/proyecto en `wrangler.json`; si tu proyecto usa otro, usa ese mismo ID/nombre.
+Usa el `database_name` de tu `wrangler.json` (ej. `mocha-appointments-db`); no el nombre del worker.
 
 ## Ejecutar en local
 
