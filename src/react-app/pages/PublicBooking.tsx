@@ -233,6 +233,7 @@ export default function PublicBookingPage() {
   const fetchAvailableSlots = async () => {
     if (!selectedService || !selectedDate) return;
     setIsLoadingSlots(true);
+    setError("");
     try {
       const params = new URLSearchParams({ date: selectedDate });
       if (selectedVariant?.id) params.set("service_variant_id", String(selectedVariant.id));
@@ -240,11 +241,18 @@ export default function PublicBookingPage() {
       const response = await fetch(`/api/public/services/${selectedService.id}/slots?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
-        setAvailableSlots(data);
+        setAvailableSlots(Array.isArray(data) ? data : []);
         setCurrentTimePage(0); // Resetear a la primera página cuando cambian los slots
+      } else {
+        const body = await response.json().catch(() => ({}));
+        const msg = body?.message || body?.error || `Error ${response.status} al cargar horarios`;
+        setError(msg);
+        setAvailableSlots([]);
       }
-    } catch (error) {
-      console.error("Error al cargar horarios:", error);
+    } catch (err) {
+      console.error("Error al cargar horarios:", err);
+      setError("No se pudieron cargar los horarios. Intenta de nuevo.");
+      setAvailableSlots([]);
     } finally {
       setIsLoadingSlots(false);
     }
