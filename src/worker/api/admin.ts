@@ -22,18 +22,6 @@ async function deleteAdminSession(kv: KVNamespace, token: string): Promise<void>
 
 const app = new Hono<{ Bindings: Env; Variables: HonoContextVariables }>();
 
-async function requireAdmin(c: { env: Env; get: (k: string) => unknown }, next: () => Promise<void>) {
-  const token = getCookie(c as Parameters<Parameters<typeof app.use>[1]>[0], ADMIN_SESSION_COOKIE);
-  if (!token) {
-    return c.json({ error: "No autorizado" }, 401) as unknown as Promise<void>;
-  }
-  const valid = await getAdminSession(c.env.SESSIONS_KV, token);
-  if (!valid) {
-    return c.json({ error: "No autorizado" }, 401) as unknown as Promise<void>;
-  }
-  await next();
-}
-
 const loginSchema = z.object({
   password: z.string().min(1, "Contraseña requerida"),
 });
