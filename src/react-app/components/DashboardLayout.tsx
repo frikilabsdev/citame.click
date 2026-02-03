@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link, useLocation, Outlet } from "react-router";
+import { useState, useEffect } from "react";
+import { Link, useLocation, Outlet, useNavigate } from "react-router";
 import { useAuth } from "@/react-app/contexts/AuthContext";
 import {
   LayoutDashboard,
@@ -15,7 +15,16 @@ import {
 export default function DashboardLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { user, isPending, logout } = useAuth();
+
+  // Redirigir a login si no está autenticado (siempre que se entre a /dashboard)
+  useEffect(() => {
+    if (isPending) return;
+    if (!user) {
+      navigate("/login", { replace: true });
+    }
+  }, [user, isPending, navigate]);
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -29,6 +38,14 @@ export default function DashboardLayout() {
     await logout();
     window.location.href = "/";
   };
+
+  if (isPending || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">

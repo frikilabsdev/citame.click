@@ -27,12 +27,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function checkAuth() {
     const pathname = window.location.pathname;
-    const isPublicRoute =
-      pathname === "/login" ||
-      pathname === "/register" ||
-      (pathname !== "/" && !pathname.startsWith("/dashboard"));
+    const isDashboardRoute = pathname.startsWith("/dashboard");
+    const isAuthPage = pathname === "/login" || pathname === "/register";
 
-    if (isPublicRoute) {
+    // Solo comprobar sesión cuando el usuario está en una ruta que lo requiere (dashboard)
+    if (!isDashboardRoute) {
       setUser(null);
       setIsPending(false);
       return;

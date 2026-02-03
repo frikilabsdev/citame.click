@@ -56,10 +56,16 @@ async function compressImage(file: File, maxWidth: number = 800, maxHeight: numb
   });
 }
 
+interface PendingVariant {
+  name: string;
+  price: string;
+  duration_minutes: string;
+}
+
 interface ServiceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (service: Partial<Service>) => Promise<void>;
+  onSave: (service: Partial<Service>) => Promise<Service | void>;
   service?: Service | null;
   tenantId: number;
   onVariantChange?: () => void | Promise<void>;
@@ -74,6 +80,7 @@ export default function ServiceModal({
   onVariantChange,
 }: ServiceModalProps) {
   const [variants, setVariants] = useState<ServiceVariant[]>([]);
+  const [pendingVariants, setPendingVariants] = useState<PendingVariant[]>([]);
   const [newVariant, setNewVariant] = useState({ name: "", price: "", duration_minutes: "" });
   const [savingVariant, setSavingVariant] = useState(false);
   const [formData, setFormData] = useState({
@@ -104,6 +111,8 @@ export default function ServiceModal({
         is_active: service.is_active,
       });
       setMainImageUrl(service.main_image_url || null);
+      setVariants(service.variants ?? []);
+      setPendingVariants([]);
       fetchServiceImages();
     } else {
       setFormData({
@@ -117,12 +126,27 @@ export default function ServiceModal({
       setMainImageUrl(null);
       setAdditionalImages([]);
       setVariants([]);
+      setPendingVariants([]);
       setNewVariant({ name: "", price: "", duration_minutes: "" });
     }
   }, [service, isOpen]);
 
   const handleAddVariant = async () => {
-    if (!service?.id || !newVariant.name.trim() || newVariant.price === "" || parseFloat(newVariant.price) < 0) return;
+    if (!newVariant.name.trim() || newVariant.price === "" || parseFloat(newVariant.price) < 0) return;
+
+    if (!service?.id) {
+      setPendingVariants((prev) => [
+        ...prev,
+        {
+          name: newVariant.name.trim(),
+          price: newVariant.price,
+          duration_minutes: newVariant.duration_minutes,
+        },
+      ]);
+      setNewVariant({ name: "", price: "", duration_minutes: "" });
+      return;
+    }
+
     setSavingVariant(true);
     try {
       const res = await fetch(`/api/services/${service.id}/variants`, {
@@ -150,6 +174,10 @@ export default function ServiceModal({
     } finally {
       setSavingVariant(false);
     }
+  };
+
+  const handleRemovePendingVariant = (index: number) => {
+    setPendingVariants((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleDeleteVariant = async (variantId: number) => {
@@ -335,13 +363,26 @@ export default function ServiceModal({
         serviceData.tenant_id = tenantId;
       }
 
-      await onSave(serviceData);
+      const created = (await onSave(serviceData)) as Service | undefined;
 
-      // If creating a new service, fetch it to get the ID for additional images
-      if (!service && isOpen) {
-        // Wait a bit for the service to be created
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        // The parent component should refresh the list, but we close the modal
+      if (!service && created?.id && pendingVariants.length > 0) {
+        for (const pv of pendingVariants) {
+          const res = await fetch(`/api/services/${created.id}/variants`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({
+              name: pv.name,
+              price: parseFloat(pv.price),
+              duration_minutes: pv.duration_minutes ? parseInt(pv.duration_minutes, 10) : null,
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || "Error al crear variantes");
+          }
+        }
+        onVariantChange?.();
       }
 
       onClose();
@@ -358,7 +399,7 @@ export default function ServiceModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
           <h2 className="text-2xl font-bold text-slate-900">
             {service ? "Editar Servicio" : "Nuevo Servicio"}
@@ -372,247 +413,228 @@ export default function ServiceModal({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Main Image */}
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Imagen Principal del Servicio
-            </label>
-            <p className="text-xs text-slate-500 mb-3">
-              Esta imagen se mostrará en las tarjetas de servicios (círculo)
-            </p>
-            <input
-              type="file"
-              ref={mainImageInputRef}
-              accept="image/jpeg,image/jpg,image/png,image/webp"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  handleMainImageUpload(file);
-                }
-              }}
-              className="hidden"
-            />
-            <div className="flex items-center space-x-4">
-              {mainImageUrl ? (
-                <>
-                  <div className="relative group">
-                    <img
-                      src={mainImageUrl}
-                      alt="Imagen principal"
-                      className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
-                    />
+          {/* Fila 1: Imagen + Título en grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Imagen Principal
+              </label>
+              <p className="text-xs text-slate-500 mb-2">
+                Se muestra en las tarjetas (círculo)
+              </p>
+              <input
+                type="file"
+                ref={mainImageInputRef}
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleMainImageUpload(file);
+                }}
+                className="hidden"
+              />
+              <div className="flex items-center gap-3">
+                {mainImageUrl ? (
+                  <>
+                    <div className="relative group">
+                      <img
+                        src={mainImageUrl}
+                        alt="Imagen principal"
+                        className="w-20 h-20 rounded-full object-cover border-2 border-slate-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setMainImageUrl(null)}
+                        className="absolute -top-1 -right-1 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setMainImageUrl(null)}
-                      className="absolute -top-1 -right-1 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                      onClick={() => mainImageInputRef.current?.click()}
+                      disabled={uploadingMainImage}
+                      className="px-3 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
                     >
-                      <X className="w-3 h-3" />
+                      {uploadingMainImage ? "Subiendo..." : "Cambiar"}
                     </button>
-                  </div>
+                  </>
+                ) : (
                   <button
                     type="button"
                     onClick={() => mainImageInputRef.current?.click()}
                     disabled={uploadingMainImage}
-                    className="px-4 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50"
                   >
-                    {uploadingMainImage ? "Subiendo..." : "Cambiar Imagen"}
+                    {uploadingMainImage ? <Loader2 className="w-5 h-5 animate-spin text-blue-600" /> : <Upload className="w-5 h-5 text-slate-600" />}
+                    <span className="text-slate-700 text-sm">Subir imagen</span>
                   </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => mainImageInputRef.current?.click()}
-                  disabled={uploadingMainImage}
-                  className="flex items-center space-x-2 px-4 py-3 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50"
-                >
-                  {uploadingMainImage ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                      <span className="text-slate-700">Subiendo...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="w-5 h-5 text-slate-600" />
-                      <span className="text-slate-700">Subir Imagen Principal</span>
-                    </>
-                  )}
-                </button>
-              )}
+                )}
+              </div>
+            </div>
+            <div className="lg:col-span-2 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Título del Servicio *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  placeholder="Ej: Corte de cabello"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Descripción resumida (tarjeta)
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={2}
+                  maxLength={150}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none"
+                  placeholder="Máx. 150 caracteres"
+                />
+                <p className="text-xs text-slate-500 mt-1">{formData.description.length}/150</p>
+              </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Título del Servicio *
-            </label>
-            <input
-              type="text"
-              required
-              value={formData.title}
-              onChange={(e) =>
-                setFormData({ ...formData, title: e.target.value })
-              }
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-              placeholder="Ej: Corte de cabello"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Descripción Resumida (para tarjeta)
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) =>
-                setFormData({ ...formData, description: e.target.value })
-              }
-              rows={2}
-              maxLength={150}
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all resize-none"
-              placeholder="Descripción breve que aparecerá en la tarjeta (máx. 150 caracteres)..."
-            />
-            <p className="text-xs text-slate-500 mt-1">
-              {formData.description.length}/150 caracteres
-            </p>
-            <p className="text-xs text-slate-400 mt-2">
-              Nota: La descripción completa se puede agregar después desde el modal de detalles
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Fila 2: Precio, Duración, Cupos en una fila */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-slate-200 pt-6">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Precio
-              </label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Precio</label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
-                  $
-                </span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">$</span>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
                   value={formData.price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, price: e.target.value })
-                  }
-                  className="w-full pl-8 pr-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  className="w-full pl-8 pr-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
                   placeholder="0.00"
                 />
               </div>
             </div>
-
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Duración (minutos)
-              </label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Duración (min)</label>
               <input
                 type="number"
                 min="1"
                 value={formData.duration_minutes}
-                onChange={(e) =>
-                  setFormData({ ...formData, duration_minutes: e.target.value })
-                }
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                onChange={(e) => setFormData({ ...formData, duration_minutes: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
                 placeholder="60"
               />
             </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Cupos simultáneos</label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={formData.max_simultaneous_bookings}
+                onChange={(e) => setFormData({ ...formData, max_simultaneous_bookings: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none"
+              />
+              <p className="text-xs text-slate-500 mt-1">Clientes en el mismo horario</p>
+            </div>
           </div>
 
-          <div>
+          {/* Variantes: crear y editar */}
+          <div className="border-t border-slate-200 pt-6">
             <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Cupos simultáneos
+              Opciones / variantes
             </label>
-            <input
-              type="number"
-              min="1"
-              required
-              value={formData.max_simultaneous_bookings}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  max_simultaneous_bookings: e.target.value,
-                })
-              }
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-            />
-            <p className="text-sm text-slate-500 mt-1">
-              Número de clientes que pueden reservar en el mismo horario
+            <p className="text-xs text-slate-500 mb-3">
+              Si el servicio tiene opciones con distinto precio o duración (ej. Mujer, Hombre, Niño), agrégalas aquí. Disponible al crear o editar.
             </p>
-          </div>
-
-          {/* Variantes (ej. Corte mujer/hombre/niño con precios distintos) - solo al editar */}
-          {service?.id && (
-            <div className="border-t border-slate-200 pt-6">
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Opciones / variantes
-              </label>
-              <p className="text-xs text-slate-500 mb-3">
-                Si el mismo servicio tiene opciones con distinto precio o duración (ej. Mujer, Hombre, Niño), agrégalas aquí.
-              </p>
-              {variants.length > 0 && (
-                <ul className="mb-4 space-y-2">
-                  {variants.map((v) => (
-                    <li
-                      key={v.id}
-                      className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50 border border-slate-200"
-                    >
-                      <span className="font-medium text-slate-800">
-                        {v.name} — ${v.price.toFixed(2)}
-                        {v.duration_minutes != null && ` · ${v.duration_minutes} min`}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteVariant(v.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title="Eliminar opción"
+            {/* Lista: al editar = variants; al crear = pendingVariants */}
+            {(service?.id ? variants.length > 0 : pendingVariants.length > 0) && (
+              <ul className="mb-4 space-y-2">
+                {service?.id
+                  ? variants.map((v) => (
+                      <li
+                        key={v.id}
+                        className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50 border border-slate-200"
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="flex flex-wrap gap-2 items-end">
-                <input
-                  type="text"
-                  value={newVariant.name}
-                  onChange={(e) => setNewVariant((prev) => ({ ...prev, name: e.target.value }))}
-                  placeholder="Nombre (ej. Mujer)"
-                  className="w-28 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                />
-                <div className="flex items-center gap-1">
-                  <span className="text-slate-500 text-sm">$</span>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={newVariant.price}
-                    onChange={(e) => setNewVariant((prev) => ({ ...prev, price: e.target.value }))}
-                    placeholder="Precio"
-                    className="w-24 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                  />
-                </div>
+                        <span className="font-medium text-slate-800">
+                          {v.name} — ${v.price.toFixed(2)}
+                          {v.duration_minutes != null && ` · ${v.duration_minutes} min`}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteVariant(v.id)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Eliminar opción"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </li>
+                    ))
+                  : pendingVariants.map((pv, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50 border border-slate-200"
+                      >
+                        <span className="font-medium text-slate-800">
+                          {pv.name} — ${pv.price}
+                          {pv.duration_minutes ? ` · ${pv.duration_minutes} min` : ""}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePendingVariant(idx)}
+                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                          title="Quitar opción"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </li>
+                    ))}
+              </ul>
+            )}
+            <div className="flex flex-wrap gap-2 items-end">
+              <input
+                type="text"
+                value={newVariant.name}
+                onChange={(e) => setNewVariant((prev) => ({ ...prev, name: e.target.value }))}
+                placeholder="Nombre (ej. Mujer)"
+                className="min-w-[120px] px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              />
+              <div className="flex items-center gap-1">
+                <span className="text-slate-500 text-sm">$</span>
                 <input
                   type="number"
-                  min="1"
-                  value={newVariant.duration_minutes}
-                  onChange={(e) => setNewVariant((prev) => ({ ...prev, duration_minutes: e.target.value }))}
-                  placeholder="Min"
-                  className="w-20 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                  step="0.01"
+                  min="0"
+                  value={newVariant.price}
+                  onChange={(e) => setNewVariant((prev) => ({ ...prev, price: e.target.value }))}
+                  placeholder="Precio"
+                  className="w-24 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={handleAddVariant}
-                  disabled={savingVariant || !newVariant.name.trim() || newVariant.price === ""}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {savingVariant ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                  Añadir opción
-                </button>
               </div>
+              <input
+                type="number"
+                min="1"
+                value={newVariant.duration_minutes}
+                onChange={(e) => setNewVariant((prev) => ({ ...prev, duration_minutes: e.target.value }))}
+                placeholder="Min"
+                className="w-20 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAddVariant}
+                disabled={savingVariant || !newVariant.name.trim() || newVariant.price === ""}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingVariant ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Añadir opción
+              </button>
             </div>
-          )}
+          </div>
 
           {/* Additional Images */}
           {service && (

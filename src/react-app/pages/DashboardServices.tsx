@@ -56,7 +56,7 @@ export default function DashboardServicesPage() {
     }
   };
 
-  const handleCreateService = async (serviceData: Partial<Service>) => {
+  const handleCreateService = async (serviceData: Partial<Service>): Promise<Service | void> => {
     const response = await fetch("/api/services", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -67,7 +67,9 @@ export default function DashboardServicesPage() {
       throw new Error("Error al crear servicio");
     }
 
+    const created = (await response.json()) as Service;
     await fetchServices();
+    return created;
   };
 
   const handleUpdateService = async (serviceData: Partial<Service>) => {
