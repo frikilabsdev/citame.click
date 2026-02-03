@@ -80,9 +80,11 @@ app.onError((err, c) => {
 
   // Return generic error message to client (don't expose internal details)
   const isDevelopment = c.req.url.includes("localhost") || c.req.url.includes("127.0.0.1");
-  
+  const errMessage = err?.message ?? String(err);
+  // Incluir message en 500 para depuración en producción (ver p. ej. /api/employees)
+  const includeMessage = isDevelopment || c.req.path.startsWith("/api/employees");
+
   if (err.name === "ZodError") {
-    // Validation errors - show details
     const zodError = err as { issues?: unknown };
     return c.json(
       {
@@ -93,24 +95,22 @@ app.onError((err, c) => {
     );
   }
 
-  // Database errors
-  if (err.message.includes("SQL") || err.message.includes("database")) {
+  if (errMessage.includes("SQL") || errMessage.includes("database")) {
     return c.json(
       {
         error: "Error en la base de datos",
-        message: isDevelopment ? err.message : undefined,
+        ...(includeMessage && { message: errMessage }),
       },
       500
     );
   }
 
-  // Generic error
   const errorStatus = (err as { status?: number }).status;
   const status: 400 | 401 | 403 | 404 | 500 = (errorStatus && (errorStatus === 400 || errorStatus === 401 || errorStatus === 403 || errorStatus === 404 || errorStatus === 500)) ? errorStatus as 400 | 401 | 403 | 404 | 500 : 500;
   return c.json(
     {
       error: "Error interno del servidor",
-      message: isDevelopment ? err.message : undefined,
+      ...(includeMessage && { message: errMessage }),
     },
     status
   );

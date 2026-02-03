@@ -64,6 +64,8 @@ Con eso, el workflow **Deploy to Cloudflare Workers** podrá autenticarse en Clo
 
 Si algún paso falla, el deploy no se realiza y puedes ver el error en la pestaña Actions del repositorio.
 
+**Importante:** El deploy **solo actualiza el Worker** (código y assets). **No aplica migraciones de D1**. Si añades nuevas tablas o columnas (p. ej. migración 7), debes ejecutarlas tú en la D1 remota (ver sección “Aplicar la migración 7” más abajo). Sin eso, la API puede devolver 500 en producción aunque el código esté desplegado.
+
 ## Deploy manual desde GitHub
 
 En el repo: **Actions** → **Deploy to Cloudflare Workers** → **Run workflow** (botón). Ejecuta el mismo flujo sin hacer push.
@@ -82,3 +84,43 @@ Necesitas tener configurado Wrangler (login previo con `npx wrangler login` o va
 ## Por qué la versión en producción no se actualizaba
 
 Si la versión desplegada (p. ej. "vcba32555") no cambiaba tras hacer push, es porque **no había ningún pipeline que desplegara al subir a GitHub**. Con este workflow, cada push a `main` genera un nuevo deploy y la versión en https://citame.click se actualiza automáticamente.
+
+## Aplicar la migración 7 (empleados) en producción (D1 remoto)
+
+**El 500 en `/api/employees` en producción** suele deberse a que la migración 7 no está aplicada en la base D1 **remota**. El deploy del Worker no aplica migraciones; hay que ejecutarlas a mano (o con el script) desde tu máquina.
+
+1. Autentícate con Cloudflare (solo hace falta una vez):
+   ```bash
+   npx wrangler login
+   ```
+
+2. Aplica la migración 7 en **remoto** (recomendado; usa SQL idempotente y no falla si las tablas ya existen):
+   ```bash
+   ./scripts/apply-migration-7-remote.sh
+   ```
+
+   Ese script ejecuta `7-idempotent.sql` y luego `7-add-appointments-employee-id.sql` contra la D1 de producción.
+
+**Alternativas:**
+
+- **Migraciones completas** (solo si la D1 remota está vacía o al día con el historial de Wrangler):
+  ```bash
+  npx wrangler d1 migrations apply mocha-appointments-db --remote
+  ```
+
+- **Manual:** ejecutar en remoto los archivos en este orden:
+  ```bash
+  npx wrangler d1 execute mocha-appointments-db --remote --file=migrations/7-idempotent.sql
+  npx wrangler d1 execute mocha-appointments-db --remote --file=migrations/7-add-appointments-employee-id.sql
+  ```
+  Si el segundo falla con "duplicate column name: employee_id", la columna ya existe; no hace falta repetir.
+
+- **Desde el dashboard de Cloudflare:** Workers & Pages → D1 → tu base → **Console**. Pegar y ejecutar el contenido de `migrations/7-idempotent.sql` y luego el de `migrations/7-add-appointments-employee-id.sql` (por bloques si la consola no admite todo junto).
+
+## Cómo ver el motivo de un 500 en producción
+
+Si un endpoint devuelve 500 (p. ej. `/api/employees`), el cuerpo de la respuesta incluye un campo `message` con el detalle del error. Para verlo: **DevTools → pestaña Network → clic en la petición que devuelve 500 → Response**. Ahí verás el JSON con `error` y `message`. Con eso puedes saber si falta un binding (DB, SESSIONS_KV), si hay un error SQL, etc. Cuando dejes de depurar, se puede quitar la exposición de `message` en producción en el código.
+
+## Errores en la consola del navegador que no son de la app
+
+Si ves en la consola (F12) mensajes como `background.js`, `chrome-extension://`, `utils.js`, `extensionState.js`, `Receiving end does not exist`, `message port closed` o `ERR_FILE_NOT_FOUND` en rutas de extensiones, **son de extensiones del navegador** (Cursor, traductores, bloqueadores, etc.), no de citame.click. Para probar la app sin ese ruido: ventana de incógnito o desactivar extensiones en esa pestaña. Los únicos errores relevantes de la app son los que apuntan a tu dominio (p. ej. `https://citame.click/api/...`).

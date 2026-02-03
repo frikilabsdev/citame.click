@@ -261,12 +261,23 @@ export async function authMiddleware(
     return c.json({ error: "No autenticado" }, 401);
   }
 
-  const session = await getSession(c.env.SESSIONS_KV, sessionToken);
+  if (!c.env.SESSIONS_KV) {
+    console.error("authMiddleware: SESSIONS_KV binding missing");
+    return c.json({ error: "Error de configuración del servidor" }, 503);
+  }
+
+  let session: SessionData | null = null;
+  try {
+    session = await getSession(c.env.SESSIONS_KV, sessionToken);
+  } catch (e) {
+    console.error("authMiddleware: getSession failed", e);
+    return c.json({ error: "Error al verificar sesión" }, 500);
+  }
+
   if (!session) {
     return c.json({ error: "Sesión inválida" }, 401);
   }
 
-  // Set user in context
   c.set("user", {
     id: session.userId,
     email: session.email,

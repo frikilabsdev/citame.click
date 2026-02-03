@@ -66,6 +66,11 @@ const createTimeOffSchema = z.object({
 // GET /api/employees?tenant_id=X
 app.get("/", authMiddleware, async (c) => {
   try {
+    if (!c.env.DB) {
+      logger.error("GET /api/employees: DB binding missing", undefined, { path: c.req.path });
+      return c.json({ error: "Error al cargar empleados", message: "DB no configurado" }, 503);
+    }
+
     const user = c.get("user");
     if (!user) return c.json({ error: "No autenticado" }, 401);
 
@@ -78,24 +83,26 @@ app.get("/", authMiddleware, async (c) => {
     const hasAccess = await verifyTenantOwnership(c.env.DB, user.id, tenantId);
     if (!hasAccess) return c.json({ error: "No tienes acceso a este negocio" }, 403);
 
-    const { results: employees } = await c.env.DB.prepare(
+    const raw = await c.env.DB.prepare(
       "SELECT * FROM employees WHERE tenant_id = ? ORDER BY display_order ASC, name ASC"
     )
       .bind(tenantId)
       .all<Record<string, unknown>>();
 
-    if (!employees?.length) return c.json([]);
+    const employees = Array.isArray(raw?.results) ? raw.results : [];
+    if (!employees.length) return c.json([]);
 
     const empIds = employees.map((e) => e.id as number);
     const placeholders = empIds.map(() => "?").join(",");
     let serviceIdsByEmployee: Record<number, number[]> = {};
     try {
-      const { results: links } = await c.env.DB.prepare(
+      const linksRaw = await c.env.DB.prepare(
         `SELECT employee_id, service_id FROM employee_services WHERE employee_id IN (${placeholders})`
       )
         .bind(...empIds)
         .all<{ employee_id: number; service_id: number }>();
-      for (const link of links || []) {
+      const links = Array.isArray(linksRaw?.results) ? linksRaw.results : [];
+      for (const link of links) {
         if (!serviceIdsByEmployee[link.employee_id]) serviceIdsByEmployee[link.employee_id] = [];
         serviceIdsByEmployee[link.employee_id].push(link.service_id);
       }
@@ -122,9 +129,9 @@ app.get("/", authMiddleware, async (c) => {
       return c.json([]);
     }
     logger.error("GET /api/employees", err, { path: c.req.path });
-    const isDev = c.req.url.includes("localhost") || c.req.url.includes("127.0.0.1");
+    // Incluir message en 500 para poder ver causa en Network (quitar en producción si no se desea exponer)
     return c.json(
-      { error: "Error al cargar empleados", ...(isDev && { message: msg }) },
+      { error: "Error al cargar empleados", message: msg },
       500
     );
   }
@@ -137,6 +144,11 @@ app.post(
   zValidator("json", createEmployeeSchema),
   async (c) => {
     try {
+      if (!c.env.DB) {
+        logger.error("POST /api/employees: DB binding missing", undefined, { path: c.req.path });
+        return c.json({ error: "Error al crear empleado", message: "DB no configurado" }, 503);
+      }
+
       const user = c.get("user");
       if (!user) return c.json({ error: "No autenticado" }, 401);
 
@@ -161,7 +173,10 @@ app.post(
       const id = result.meta?.last_row_id;
       if (id == null) {
         logger.warn("POST /api/employees: INSERT ok but no last_row_id", {});
-        return c.json({ error: "Error al crear empleado" }, 500);
+        return c.json(
+          { error: "Error al crear empleado", message: "last_row_id no devuelto por D1" },
+          500
+        );
       }
 
       const row = await c.env.DB.prepare("SELECT * FROM employees WHERE id = ?")
@@ -172,9 +187,9 @@ app.post(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error("POST /api/employees", err, { path: c.req.path });
-      const isDev = c.req.url.includes("localhost") || c.req.url.includes("127.0.0.1");
+      // Incluir message en 500 para poder ver causa en Network
       return c.json(
-        { error: "Error al crear empleado", ...(isDev && { message: msg }) },
+        { error: "Error al crear empleado", message: msg },
         500
       );
     }
