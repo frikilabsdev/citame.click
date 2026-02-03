@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { Plus, Calendar, Settings, TrendingUp } from "lucide-react";
+import { Plus, Calendar, Settings, TrendingUp, Share2, Briefcase } from "lucide-react";
 import type { Tenant } from "@/shared/types";
 
 export default function DashboardPage() {
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [servicesCount, setServicesCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchTenants();
   }, []);
+
+  useEffect(() => {
+    if (tenants.length > 0) {
+      fetchServicesCount(tenants[0].id);
+    } else {
+      setServicesCount(null);
+    }
+  }, [tenants]);
 
   const fetchTenants = async () => {
     try {
@@ -22,6 +31,20 @@ export default function DashboardPage() {
       console.error("Error al cargar negocios:", error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchServicesCount = async (tenantId: number) => {
+    try {
+      const response = await fetch(`/api/services?tenant_id=${tenantId}`, { credentials: "include" });
+      if (response.ok) {
+        const data = await response.json();
+        setServicesCount(Array.isArray(data) ? data.length : 0);
+      } else {
+        setServicesCount(0);
+      }
+    } catch {
+      setServicesCount(0);
     }
   };
 
@@ -76,6 +99,43 @@ export default function DashboardPage() {
           <span>Nuevo Negocio</span>
         </Link>
       </div>
+
+      {/* Guía rápida: primera vez sin servicios */}
+      {tenants.length > 0 && servicesCount === 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+          <h3 className="text-lg font-bold text-amber-900 mb-2 flex items-center gap-2">
+            <Briefcase className="w-5 h-5" />
+            Para recibir reservas
+          </h3>
+          <p className="text-sm text-amber-800 mb-4">
+            Sigue estos pasos para que tus clientes puedan agendar citas:
+          </p>
+          <ol className="space-y-2 text-sm text-amber-900">
+            <li className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-200 font-semibold">1</span>
+              <Link to="/dashboard/services" className="underline font-medium hover:text-amber-700">
+                Añade servicios
+              </Link>
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-200 font-semibold">2</span>
+              <Link to="/dashboard/schedules" className="underline font-medium hover:text-amber-700">
+                Configura horarios
+              </Link>
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-amber-200 font-semibold">3</span>
+              <span className="flex items-center gap-1">
+                Comparte tu enlace
+                <Share2 className="w-4 h-4" />
+              </span>
+              <span className="text-amber-700">
+                (citame.click/tu-slug)
+              </span>
+            </li>
+          </ol>
+        </div>
+      )}
 
       {/* Stats cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

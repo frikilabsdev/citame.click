@@ -117,6 +117,12 @@ Si la versión desplegada (p. ej. "vcba32555") no cambiaba tras hacer push, es p
 
 - **Desde el dashboard de Cloudflare:** Workers & Pages → D1 → tu base → **Console**. Pegar y ejecutar el contenido de `migrations/7-idempotent.sql` y luego el de `migrations/7-add-appointments-employee-id.sql` (por bloques si la consola no admite todo junto).
 
+**Si el error en producción es "table employees has no column named display_order":** la tabla se creó sin esa columna. Añádela en remoto:
+```bash
+npx wrangler d1 execute mocha-appointments-db --remote --file=migrations/7-add-employees-display-order.sql
+```
+(Si falla con "duplicate column name", la columna ya existe.)
+
 ## Cómo ver el motivo de un 500 en producción
 
 Si un endpoint devuelve 500 (p. ej. `/api/employees`), el cuerpo de la respuesta incluye un campo `message` con el detalle del error. Para verlo: **DevTools → pestaña Network → clic en la petición que devuelve 500 → Response**. Ahí verás el JSON con `error` y `message`. Con eso puedes saber si falta un binding (DB, SESSIONS_KV), si hay un error SQL, etc. Cuando dejes de depurar, se puede quitar la exposición de `message` en producción en el código.

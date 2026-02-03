@@ -43,6 +43,7 @@
     "cf-typegen": "wrangler types",
     "check": "tsc && vite build && wrangler deploy --dry-run",
     "dev": "vite",
+    "db:migrate:local": "wrangler d1 execute mocha-appointments-db --local --file=migrations/1.sql && wrangler d1 execute mocha-appointments-db --local --file=migrations/2.sql && wrangler d1 execute mocha-appointments-db --local --file=migrations/3.sql && wrangler d1 execute mocha-appointments-db --local --file=migrations/4.sql && wrangler d1 execute mocha-appointments-db --local --file=migrations/5.sql && wrangler d1 execute mocha-appointments-db --local --file=migrations/6.sql && wrangler d1 execute mocha-appointments-db --local --file=migrations/7-idempotent.sql && wrangler d1 execute mocha-appointments-db --local --file=migrations/7-add-appointments-employee-id.sql",
     "knip": "knip",
     "lint": "eslint ."
   }

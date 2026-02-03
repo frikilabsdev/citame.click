@@ -59,6 +59,16 @@ export default function PublicBookingPage() {
   const [detailModalService, setDetailModalService] = useState<Service | null>(null);
   const [serviceSearchQuery, setServiceSearchQuery] = useState("");
 
+  // Paso actual para el indicador visual (1–4)
+  const currentStep = bookingComplete
+    ? 4
+    : selectedService && selectedDate && selectedTime
+      ? 3
+      : selectedService
+        ? 2
+        : 1;
+  const stepLabels = ["Servicio", "Fecha y hora", "Tus datos", "Confirmación"];
+
   const [formData, setFormData] = useState({
     customer_name: "",
     customer_phone: "",
@@ -365,6 +375,9 @@ export default function PublicBookingPage() {
         }}
       >
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <p className="text-sm font-medium mb-2" style={{ color: primaryColor }}>
+            Paso 4 de 4: Confirmación
+          </p>
           <div 
             className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center shadow-lg"
             style={{
@@ -598,9 +611,65 @@ export default function PublicBookingPage() {
           </div>
         )}
 
+        {/* Indicador de pasos (stepper) */}
+        <div className="mb-6" aria-label={`Paso ${currentStep} de 4`}>
+          <div className="flex items-center justify-center gap-1 sm:gap-2">
+            {[1, 2, 3, 4].map((step) => {
+              const isActive = step === currentStep;
+              const isDone = step < currentStep;
+              const primaryColor = custom?.primary_color || "#3b82f6";
+              return (
+                <div key={step} className="flex items-center">
+                  <div
+                    className={`flex items-center justify-center rounded-full text-sm font-semibold transition-all ${
+                      isDone ? "opacity-90" : isActive ? "ring-2 ring-offset-2" : "opacity-50"
+                    }`}
+                    style={{
+                      width: "2rem",
+                      height: "2rem",
+                      backgroundColor: isDone || isActive ? primaryColor : (custom?.card_border_color || "#e5e7eb"),
+                      color: isDone || isActive ? "#fff" : (custom?.text_color || "#6b7280"),
+                      ...(isActive && { boxShadow: `0 0 0 2px ${primaryColor}40` }),
+                    }}
+                  >
+                    {isDone ? <CheckCircle className="w-4 h-4" /> : step}
+                  </div>
+                  <span
+                    className={`hidden sm:inline ml-1 text-xs font-medium md:text-sm ${
+                      isActive ? "font-semibold" : ""
+                    }`}
+                    style={{
+                      color: isActive ? (custom?.service_title_color || "#111827") : (custom?.text_color || "#6b7280"),
+                    }}
+                  >
+                    {stepLabels[step - 1]}
+                  </span>
+                  {step < 4 && (
+                    <div
+                      className="w-4 sm:w-8 h-0.5 mx-0.5 sm:mx-1 rounded"
+                      style={{
+                        backgroundColor: isDone ? primaryColor : (custom?.card_border_color || "#e5e7eb"),
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-center mt-2 text-sm sm:hidden" style={{ color: custom?.text_color || "#6b7280" }}>
+            Paso {currentStep} de 4
+          </p>
+        </div>
+
         {/* Step 1: Select Service (Linktree style cards) */}
         {!selectedService && (
           <div className="space-y-3">
+            <h2 className="text-xl font-bold mb-1" style={{ color: custom?.service_title_color || "#111827" }}>
+              Paso 1 de 4: Servicio
+            </h2>
+            <p className="text-sm mb-4" style={{ color: custom?.text_color || "#6b7280" }}>
+              Elige el servicio que quieres agendar
+            </p>
             {services
               .filter((service) => {
                 const q = serviceSearchQuery.trim().toLowerCase();
@@ -742,6 +811,12 @@ export default function PublicBookingPage() {
               borderStyle: "solid",
             }}
           >
+            <h2 className="text-xl font-bold mb-1" style={{ color: custom?.service_title_color || "#111827" }}>
+              Paso 2 de 4: Fecha y hora
+            </h2>
+            <p className="text-sm mb-4" style={{ color: custom?.text_color || "#6b7280" }}>
+              Elige el día y la hora disponibles para tu cita
+            </p>
             <button
               onClick={() => { setSelectedService(null); setSelectedVariant(null); setSelectedEmployee(null); }}
               className="flex items-center space-x-2 mb-4 transition-colors"
@@ -1002,7 +1077,7 @@ export default function PublicBookingPage() {
           </div>
         )}
 
-        {/* Time slots */}
+        {/* Time slots (sigue siendo Paso 2) */}
         {selectedService && selectedDate && !selectedTime && (
           <div 
             className="rounded-2xl shadow-xl p-6"
@@ -1146,6 +1221,12 @@ export default function PublicBookingPage() {
               borderStyle: "solid",
             }}
           >
+            <h2 className="text-xl font-bold mb-1" style={{ color: custom?.service_title_color || "#111827" }}>
+              Paso 3 de 4: Tus datos
+            </h2>
+            <p className="text-sm mb-4" style={{ color: custom?.text_color || "#6b7280" }}>
+              Datos de contacto para confirmar tu cita
+            </p>
             <button
               onClick={() => setSelectedTime("")}
               className="flex items-center space-x-2 mb-4 transition-colors"
@@ -1163,9 +1244,9 @@ export default function PublicBookingPage() {
               <span className="text-sm">Cambiar hora</span>
             </button>
 
-            <h2 className="text-xl font-bold mb-4" style={{ color: custom?.service_title_color || "#111827" }}>
+            <h3 className="text-lg font-bold mb-4" style={{ color: custom?.service_title_color || "#111827" }}>
               Completa tus datos
-            </h2>
+            </h3>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Estilos dinámicos para placeholders y selects */}
