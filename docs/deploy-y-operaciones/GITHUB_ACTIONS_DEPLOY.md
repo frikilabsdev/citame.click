@@ -85,6 +85,18 @@ Necesitas tener configurado Wrangler (login previo con `npx wrangler login` o va
 
 Si la versión desplegada (p. ej. "vcba32555") no cambiaba tras hacer push, es porque **no había ningún pipeline que desplegara al subir a GitHub**. Con este workflow, cada push a `main` genera un nuevo deploy y la versión en https://citame.click se actualiza automáticamente.
 
+## Aplicar la migración 6 (service_variant_id en appointments) en producción
+
+**Si al crear una cita ves:** `"table appointments has no column named service_variant_id"`, la columna no existe en la D1 remota. Ejecuta en tu máquina (con `npx wrangler login` hecho antes):
+
+```bash
+npx wrangler d1 execute mocha-appointments-db --remote --file=migrations/6-add-appointments-service-variant-id.sql
+```
+
+Si falla con "duplicate column name: service_variant_id", la columna ya existe y no hace falta repetir.
+
+**Desde el dashboard de Cloudflare:** Workers & Pages → D1 → mocha-appointments-db → **Console** → ejecutar: `ALTER TABLE appointments ADD COLUMN service_variant_id INTEGER;`
+
 ## Aplicar la migración 7 (empleados) en producción (D1 remoto)
 
 **El 500 en `/api/employees` en producción** suele deberse a que la migración 7 no está aplicada en la base D1 **remota**. El deploy del Worker no aplica migraciones; hay que ejecutarlas a mano (o con el script) desde tu máquina.
