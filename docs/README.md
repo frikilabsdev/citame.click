@@ -26,3 +26,4 @@
 - [deploy-y-operaciones/PRE_GITHUB_CHECKLIST.md](deploy-y-operaciones/PRE_GITHUB_CHECKLIST.md) — Checklist antes de subir a GitHub
 - [deploy-y-operaciones/DOKPLOY_CONFIG.md](deploy-y-operaciones/DOKPLOY_CONFIG.md) — Configuración para Dokploy
 - [deploy-y-operaciones/DOKPLOY_STEPS.md](deploy-y-operaciones/DOKPLOY_STEPS.md) — Pasos de Dokploy
+- [deploy-y-operaciones/GITHUB_ACTIONS_DEPLOY.md](deploy-y-operaciones/GITHUB_ACTIONS_DEPLOY.md) — Deploy automático en cada push a main

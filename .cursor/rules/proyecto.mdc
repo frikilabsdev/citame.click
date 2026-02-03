@@ -21,6 +21,10 @@ alwaysApply: true
 - `src/shared/types.ts` — Tipos compartidos (Tenant, Service, Appointment, etc.)
 - `migrations/` — SQL en orden 1–5; no romper compatibilidad D1
 
+## Git
+
+- Usar remote SSH para GitHub (`git@github.com:usuario/repo.git`) para que `git push` funcione sin prompt de credenciales (sobre todo en entornos no interactivos). Si el remote es HTTPS, cambiarlo: `git remote set-url origin git@github.com:usuario/repo.git`.
+
 ## Convenciones
 
 - UI y mensajes al usuario en **español**.

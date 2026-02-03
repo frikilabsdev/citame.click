@@ -26,6 +26,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function checkAuth() {
+    const pathname = window.location.pathname;
+    const isPublicRoute =
+      pathname === "/login" ||
+      pathname === "/register" ||
+      (pathname !== "/" && !pathname.startsWith("/dashboard"));
+
+    if (isPublicRoute) {
+      setUser(null);
+      setIsPending(false);
+      return;
+    }
+
     try {
       const response = await fetch("/api/users/me", {
         credentials: "include",
