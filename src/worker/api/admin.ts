@@ -158,6 +158,7 @@ app.delete("/businesses/:id", async (c) => {
 
   if (serviceIds.length > 0) {
     const placeholders = serviceIds.map(() => "?").join(",");
+    await db.prepare(`DELETE FROM service_variants WHERE service_id IN (${placeholders})`).bind(...serviceIds).run();
     await db.prepare(`DELETE FROM schedule_exceptions WHERE service_id IN (${placeholders})`).bind(...serviceIds).run();
     await db.prepare(`DELETE FROM availability_schedules WHERE service_id IN (${placeholders})`).bind(...serviceIds).run();
     await db.prepare(`DELETE FROM service_images WHERE service_id IN (${placeholders})`).bind(...serviceIds).run();

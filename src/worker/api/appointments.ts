@@ -7,6 +7,7 @@ const app = new Hono<{ Bindings: Env; Variables: HonoContextVariables }>();
 
 interface AppointmentWithService extends Appointment {
   service_title: string;
+  service_variant_name?: string | null;
 }
 
 // Get all appointments for user's tenants
@@ -22,9 +23,11 @@ app.get("/", authMiddleware, async (c) => {
   let query = `
     SELECT 
       a.*,
-      s.title as service_title
+      s.title as service_title,
+      sv.name as service_variant_name
     FROM appointments a
     JOIN services s ON a.service_id = s.id
+    LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
     JOIN tenants t ON a.tenant_id = t.id
     WHERE t.owner_user_id = ?
   `;
@@ -61,9 +64,11 @@ app.get("/:id", authMiddleware, async (c) => {
   const appointment = await c.env.DB.prepare(
     `SELECT 
       a.*,
-      s.title as service_title
+      s.title as service_title,
+      sv.name as service_variant_name
     FROM appointments a
     JOIN services s ON a.service_id = s.id
+    LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
     JOIN tenants t ON a.tenant_id = t.id
     WHERE a.id = ? AND t.owner_user_id = ?`
   )
@@ -90,11 +95,13 @@ app.get("/:id/ics", authMiddleware, async (c) => {
     `SELECT 
       a.*,
       s.title as service_title,
-      s.duration_minutes,
+      COALESCE(sv.duration_minutes, s.duration_minutes) as duration_minutes,
+      sv.name as service_variant_name,
       bc.business_name,
       bc.address
     FROM appointments a
     JOIN services s ON a.service_id = s.id
+    LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
     JOIN tenants t ON a.tenant_id = t.id
     JOIN business_configs bc ON a.tenant_id = bc.tenant_id
     WHERE a.id = ? AND t.owner_user_id = ?`
@@ -103,6 +110,7 @@ app.get("/:id/ics", authMiddleware, async (c) => {
     .first<Appointment & { 
       service_title: string;
       duration_minutes: number | null;
+      service_variant_name: string | null;
       business_name: string | null;
       address: string | null;
     }>();
@@ -130,9 +138,12 @@ app.get("/:id/ics", authMiddleware, async (c) => {
     paymentMethodText = methodMap[appointmentDetails.payment_method] || appointmentDetails.payment_method;
   }
 
+  const serviceTitleDisplay = appointmentDetails.service_variant_name
+    ? `${appointmentDetails.service_title} (${appointmentDetails.service_variant_name})`
+    : appointmentDetails.service_title;
   const icsContent = generateICS({
-    title: `${appointmentDetails.service_title} - ${appointmentDetails.business_name || 'Cita'}`,
-    description: `Cita confirmada para ${appointmentDetails.service_title}${paymentMethodText ? `\nMétodo de pago: ${paymentMethodText}` : ''}`,
+    title: `${serviceTitleDisplay} - ${appointmentDetails.business_name || 'Cita'}`,
+    description: `Cita confirmada para ${serviceTitleDisplay}${paymentMethodText ? `\nMétodo de pago: ${paymentMethodText}` : ''}`,
     location: appointmentDetails.address || undefined,
     startDate,
     endDate,
@@ -185,18 +196,20 @@ app.patch("/:id/status", authMiddleware, async (c) => {
     return c.json({ error: "No se puede cambiar el estado de una cita completada" }, 403);
   }
 
-  // Get full appointment details with business config for WhatsApp
+  // Get full appointment details with business config for WhatsApp (effective price/duration from variant or service)
   const appointmentDetails = await c.env.DB.prepare(
     `SELECT 
       a.*,
       s.title as service_title,
-      s.duration_minutes,
-      s.price as service_price,
+      COALESCE(sv.duration_minutes, s.duration_minutes) as duration_minutes,
+      COALESCE(sv.price, s.price) as service_price,
+      sv.name as service_variant_name,
       bc.whatsapp as business_whatsapp,
       bc.business_name,
       bc.address
     FROM appointments a
     JOIN services s ON a.service_id = s.id
+    LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
     JOIN business_configs bc ON a.tenant_id = bc.tenant_id
     WHERE a.id = ?`
   )
@@ -205,6 +218,7 @@ app.patch("/:id/status", authMiddleware, async (c) => {
       business_whatsapp: string | null;
       duration_minutes: number | null;
       service_price: number | null;
+      service_variant_name: string | null;
       business_name: string | null;
       address: string | null;
     }>();
@@ -236,9 +250,11 @@ app.patch("/:id/status", authMiddleware, async (c) => {
   const updated = await c.env.DB.prepare(
     `SELECT 
       a.*,
-      s.title as service_title
+      s.title as service_title,
+      sv.name as service_variant_name
     FROM appointments a
     JOIN services s ON a.service_id = s.id
+    LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
     WHERE a.id = ?`
   )
     .bind(appointmentId)
@@ -275,10 +291,14 @@ app.patch("/:id/status", authMiddleware, async (c) => {
       paymentMethodText = methodMap[appointmentDetails.payment_method] || appointmentDetails.payment_method;
     }
 
+    const serviceTitleDisplay = appointmentDetails.service_variant_name
+      ? `${appointmentDetails.service_title} (${appointmentDetails.service_variant_name})`
+      : appointmentDetails.service_title;
+
     let message = "";
     if (body.status === "confirmed") {
       message = `¡Hola ${appointmentDetails.customer_name}! Tu cita ha sido confirmada.\n\n`;
-      message += `Servicio: ${appointmentDetails.service_title}\n`;
+      message += `Servicio: ${serviceTitleDisplay}\n`;
       
       if (appointmentDetails.service_price) {
         message += `Costo: $${appointmentDetails.service_price.toFixed(2)}\n`;
@@ -307,8 +327,8 @@ app.patch("/:id/status", authMiddleware, async (c) => {
       endDate.setMinutes(endDate.getMinutes() + durationMinutes);
 
       const icsContent = generateICS({
-        title: `${appointmentDetails.service_title} - ${appointmentDetails.business_name || 'Cita'}`,
-        description: `Cita confirmada para ${appointmentDetails.service_title}${paymentMethodText ? `\nMétodo de pago: ${paymentMethodText}` : ''}`,
+        title: `${serviceTitleDisplay} - ${appointmentDetails.business_name || 'Cita'}`,
+        description: `Cita confirmada para ${serviceTitleDisplay}${paymentMethodText ? `\nMétodo de pago: ${paymentMethodText}` : ''}`,
         location: appointmentDetails.address || undefined,
         startDate,
         endDate,
@@ -412,9 +432,11 @@ app.put("/:id", authMiddleware, async (c) => {
   const updated = await c.env.DB.prepare(
     `SELECT 
       a.*,
-      s.title as service_title
+      s.title as service_title,
+      sv.name as service_variant_name
     FROM appointments a
     JOIN services s ON a.service_id = s.id
+    LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
     WHERE a.id = ?`
   )
     .bind(appointmentId)

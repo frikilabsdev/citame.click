@@ -14,7 +14,7 @@ import {
   ArrowLeft,
   Search,
 } from "lucide-react";
-import type { Service, BusinessConfig, Tenant, PaymentMethod, SocialNetwork, VisualCustomization } from "@/shared/types";
+import type { Service, ServiceVariant, BusinessConfig, Tenant, PaymentMethod, SocialNetwork, VisualCustomization } from "@/shared/types";
 import { getSocialIcon } from "@/react-app/components/SocialIcons";
 import ServiceDetailModal from "@/react-app/components/ServiceDetailModal";
 
@@ -30,6 +30,7 @@ export default function PublicBookingPage() {
   const [tenantData, setTenantData] = useState<TenantData | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedVariant, setSelectedVariant] = useState<ServiceVariant | null>(null);
   const [selectedDate, setSelectedDate] = useState("");
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState("");
@@ -75,7 +76,7 @@ export default function PublicBookingPage() {
       setAvailableSlots([]);
       setCurrentMonth(new Date());
     }
-  }, [selectedService]);
+  }, [selectedService, selectedVariant]);
 
   useEffect(() => {
     if (selectedService && selectedDate) {
@@ -85,7 +86,7 @@ export default function PublicBookingPage() {
       setSelectedTime("");
       setCurrentTimePage(0);
     }
-  }, [selectedService, selectedDate]);
+  }, [selectedService, selectedVariant, selectedDate]);
 
   const fetchTenantData = async () => {
     try {
@@ -135,9 +136,11 @@ export default function PublicBookingPage() {
     
     setIsLoadingDates(true);
     try {
-      const response = await fetch(
-        `/api/public/services/${selectedService.id}/available-dates`
-      );
+      let url = `/api/public/services/${selectedService.id}/available-dates`;
+      if (selectedVariant?.id) {
+        url += `?service_variant_id=${selectedVariant.id}`;
+      }
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setAvailableDates(data);
@@ -185,6 +188,7 @@ export default function PublicBookingPage() {
         body: JSON.stringify({
           tenant_id: tenantData.tenant.id,
           service_id: selectedService.id,
+          service_variant_id: selectedVariant?.id ?? null,
           appointment_date: selectedDate,
           appointment_time: selectedTime,
           payment_method: selectedPaymentMethod?.method_type || null,
@@ -219,6 +223,7 @@ export default function PublicBookingPage() {
   const resetBooking = () => {
     setBookingComplete(false);
     setSelectedService(null);
+    setSelectedVariant(null);
     setSelectedDate("");
     setSelectedTime("");
     setFormData({
@@ -636,16 +641,28 @@ export default function PublicBookingPage() {
                       
                     <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: custom?.card_border_color || "#e5e7eb" }}>
                       <div className="flex items-center space-x-4 text-sm" style={{ color: custom?.time_text_color || "#6b7280" }}>
-                    {service.duration_minutes && (
+                    {service.variants?.length ? (
+                      (() => {
+                        const mins = service.variants.map((v) => v.duration_minutes).filter((d): d is number => d != null);
+                        return mins.length > 0 ? (
+                          <div className="flex items-center space-x-1.5">
+                            <Clock className="w-4 h-4" />
+                            <span>{Math.min(...mins)} min</span>
+                          </div>
+                        ) : null;
+                      })()
+                    ) : service.duration_minutes != null ? (
                           <div className="flex items-center space-x-1.5">
                         <Clock className="w-4 h-4" />
                         <span>{service.duration_minutes} min</span>
                       </div>
-                    )}
+                    ) : null}
                       </div>
-                    {service.price && (
+                    {(service.variants?.length ? service.variants.length > 0 : service.price != null) && (
                         <div className="font-bold text-lg" style={{ color: custom?.price_color || "#059669" }}>
-                        ${service.price.toFixed(2)}
+                        {service.variants?.length
+                          ? `desde $${Math.min(...service.variants.map((v) => v.price)).toFixed(2)}`
+                          : `$${service.price!.toFixed(2)}`}
                       </div>
                     )}
                   </div>
@@ -661,8 +678,9 @@ export default function PublicBookingPage() {
           isOpen={!!detailModalService}
           onClose={() => setDetailModalService(null)}
           service={detailModalService}
-          onSelectService={(service) => {
+          onSelectService={(service, variant) => {
             setSelectedService(service);
+            setSelectedVariant(variant);
             setDetailModalService(null);
           }}
           customColors={custom ? {
@@ -689,7 +707,7 @@ export default function PublicBookingPage() {
             }}
           >
             <button
-              onClick={() => setSelectedService(null)}
+              onClick={() => { setSelectedService(null); setSelectedVariant(null); }}
               className="flex items-center space-x-2 mb-4 transition-colors"
               style={{ 
                 color: custom?.text_color || "#6b7280",

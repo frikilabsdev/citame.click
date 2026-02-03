@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { X, ChevronLeft, ChevronRight, Clock, DollarSign, Image as ImageIcon } from "lucide-react";
-import type { Service, ServiceImage } from "@/shared/types";
+import type { Service, ServiceImage, ServiceVariant } from "@/shared/types";
 
 interface ServiceDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   service: Service | null;
-  onSelectService: (service: Service) => void;
+  onSelectService: (service: Service, variant: ServiceVariant | null) => void;
   customColors?: {
     primary_color?: string;
     secondary_color?: string;
@@ -29,13 +29,16 @@ export default function ServiceDetailModal({
   const [images, setImages] = useState<ServiceImage[]>([]);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isLoadingImages, setIsLoadingImages] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState<ServiceVariant | null>(null);
 
   useEffect(() => {
     if (service && isOpen) {
       fetchImages();
+      setSelectedVariant(service.variants?.length ? service.variants[0] ?? null : null);
     } else {
       setImages([]);
       setCurrentImageIndex(0);
+      setSelectedVariant(null);
     }
   }, [service, isOpen]);
 
@@ -224,12 +227,19 @@ export default function ServiceDetailModal({
 
           {/* Action Button */}
           <div className="pt-4 border-t" style={{ borderColor: customColors?.card_border_color || "#e5e7eb" }}>
+            {service.variants && service.variants.length > 0 && !selectedVariant && (
+              <p className="text-sm mb-3" style={{ color: customColors?.time_text_color || "#6b7280" }}>
+                Elige una opción arriba para continuar
+              </p>
+            )}
             <button
               onClick={() => {
-                onSelectService(service);
+                if (service.variants && service.variants.length > 0 && !selectedVariant) return;
+                onSelectService(service, selectedVariant);
                 onClose();
               }}
-              className="w-full px-6 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all"
+              disabled={service.variants != null && service.variants.length > 0 && !selectedVariant}
+              className="w-full px-6 py-4 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: customColors?.primary_color && customColors?.secondary_color
                   ? `linear-gradient(135deg, ${customColors.primary_color} 0%, ${customColors.secondary_color} 100%)`

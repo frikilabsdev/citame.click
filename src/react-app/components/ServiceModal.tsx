@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { X, Upload, Image as ImageIcon, Trash2, Loader2 } from "lucide-react";
-import type { Service, ServiceImage } from "@/shared/types";
+import { X, Upload, Image as ImageIcon, Trash2, Loader2, Plus } from "lucide-react";
+import type { Service, ServiceImage, ServiceVariant } from "@/shared/types";
 
 // Función para comprimir imagen usando Canvas API
 async function compressImage(file: File, maxWidth: number = 800, maxHeight: number = 800, quality: number = 0.85): Promise<Blob> {
@@ -62,6 +62,7 @@ interface ServiceModalProps {
   onSave: (service: Partial<Service>) => Promise<void>;
   service?: Service | null;
   tenantId: number;
+  onVariantChange?: () => void | Promise<void>;
 }
 
 export default function ServiceModal({
@@ -70,7 +71,11 @@ export default function ServiceModal({
   service,
   onSave,
   tenantId,
+  onVariantChange,
 }: ServiceModalProps) {
+  const [variants, setVariants] = useState<ServiceVariant[]>([]);
+  const [newVariant, setNewVariant] = useState({ name: "", price: "", duration_minutes: "" });
+  const [savingVariant, setSavingVariant] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -111,8 +116,60 @@ export default function ServiceModal({
       });
       setMainImageUrl(null);
       setAdditionalImages([]);
+      setVariants([]);
+      setNewVariant({ name: "", price: "", duration_minutes: "" });
     }
   }, [service, isOpen]);
+
+  const handleAddVariant = async () => {
+    if (!service?.id || !newVariant.name.trim() || newVariant.price === "" || parseFloat(newVariant.price) < 0) return;
+    setSavingVariant(true);
+    try {
+      const res = await fetch(`/api/services/${service.id}/variants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: newVariant.name.trim(),
+          price: parseFloat(newVariant.price),
+          duration_minutes: newVariant.duration_minutes ? parseInt(newVariant.duration_minutes, 10) : null,
+        }),
+      });
+      if (res.ok) {
+        const created = await res.json();
+        setVariants((prev) => [...prev, created]);
+        setNewVariant({ name: "", price: "", duration_minutes: "" });
+        onVariantChange?.();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || "Error al agregar variante");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error al agregar variante");
+    } finally {
+      setSavingVariant(false);
+    }
+  };
+
+  const handleDeleteVariant = async (variantId: number) => {
+    if (!service?.id || !confirm("¿Eliminar esta opción?")) return;
+    try {
+      const res = await fetch(`/api/services/${service.id}/variants/${variantId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        setVariants((prev) => prev.filter((v) => v.id !== variantId));
+        onVariantChange?.();
+      } else {
+        alert("Error al eliminar");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error al eliminar variante");
+    }
+  };
 
   const fetchServiceImages = async () => {
     if (!service?.id) return;
@@ -553,6 +610,79 @@ export default function ServiceModal({
               <p className="text-sm text-blue-800">
                 <strong>Nota:</strong> Para agregar imágenes adicionales, primero guarda el servicio y luego edítalo.
               </p>
+            </div>
+          )}
+
+          {/* Variantes (ej. Corte mujer/hombre/niño con precios distintos) */}
+          {service?.id && (
+            <div className="border-t border-slate-200 pt-6">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Opciones / variantes
+              </label>
+              <p className="text-xs text-slate-500 mb-3">
+                Si el mismo servicio tiene opciones con distinto precio o duración (ej. Mujer, Hombre, Niño), agrégalas aquí.
+              </p>
+              {variants.length > 0 && (
+                <ul className="mb-4 space-y-2">
+                  {variants.map((v) => (
+                    <li
+                      key={v.id}
+                      className="flex items-center justify-between py-2 px-3 rounded-lg bg-slate-50 border border-slate-200"
+                    >
+                      <span className="font-medium text-slate-800">
+                        {v.name} — ${v.price.toFixed(2)}
+                        {v.duration_minutes != null && ` · ${v.duration_minutes} min`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteVariant(v.id)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Eliminar opción"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="flex flex-wrap gap-2 items-end">
+                <input
+                  type="text"
+                  value={newVariant.name}
+                  onChange={(e) => setNewVariant((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Nombre (ej. Mujer)"
+                  className="w-28 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                />
+                <div className="flex items-center gap-1">
+                  <span className="text-slate-500 text-sm">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newVariant.price}
+                    onChange={(e) => setNewVariant((prev) => ({ ...prev, price: e.target.value }))}
+                    placeholder="Precio"
+                    className="w-24 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                  />
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  value={newVariant.duration_minutes}
+                  onChange={(e) => setNewVariant((prev) => ({ ...prev, duration_minutes: e.target.value }))}
+                  placeholder="Min"
+                  className="w-20 px-3 py-2 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddVariant}
+                  disabled={savingVariant || !newVariant.name.trim() || newVariant.price === ""}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {savingVariant ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  Añadir opción
+                </button>
+              </div>
             </div>
           )}
 

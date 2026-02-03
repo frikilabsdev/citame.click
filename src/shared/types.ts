@@ -21,6 +21,17 @@ export interface BusinessConfig {
   updated_at: string;
 }
 
+export interface ServiceVariant {
+  id: number;
+  service_id: number;
+  name: string;
+  price: number;
+  duration_minutes: number | null;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Service {
   id: number;
   tenant_id: number;
@@ -34,6 +45,7 @@ export interface Service {
   created_at: string;
   updated_at: string;
   images?: ServiceImage[]; // Optional: images array when fetching with images
+  variants?: ServiceVariant[]; // Optional: variantes cuando el servicio tiene opciones (ej. mujer/hombre/niño)
 }
 
 export interface ServiceImage {
@@ -96,6 +108,7 @@ export interface Appointment {
   id: number;
   tenant_id: number;
   service_id: number;
+  service_variant_id: number | null;
   customer_name: string;
   customer_phone: string;
   customer_email: string | null;

@@ -76,13 +76,36 @@ app.get("/tenants/:slug/services", async (c) => {
     return c.json({ error: "Negocio no encontrado" }, 404);
   }
 
-  const { results } = await c.env.DB.prepare(
+  const { results: services } = await c.env.DB.prepare(
     "SELECT * FROM services WHERE tenant_id = ? AND is_active = 1 ORDER BY created_at DESC"
   )
     .bind(tenant.id)
     .all<Service>();
 
-  return c.json(results);
+  if (!services?.length) {
+    return c.json([]);
+  }
+
+  const ids = services.map((s) => s.id);
+  const placeholders = ids.map(() => "?").join(",");
+  const { results: variants } = await c.env.DB.prepare(
+    `SELECT * FROM service_variants WHERE service_id IN (${placeholders}) ORDER BY service_id, display_order ASC, id ASC`
+  )
+    .bind(...ids)
+    .all<{ id: number; service_id: number; name: string; price: number; duration_minutes: number | null; display_order: number }>();
+
+  const variantsByServiceId: Record<number, typeof variants> = {};
+  for (const v of variants || []) {
+    if (!variantsByServiceId[v.service_id]) variantsByServiceId[v.service_id] = [];
+    variantsByServiceId[v.service_id].push(v);
+  }
+
+  const servicesWithVariants = services.map((s) => ({
+    ...s,
+    variants: variantsByServiceId[s.id] || [],
+  }));
+
+  return c.json(servicesWithVariants);
 });
 
 // Get active payment methods for a tenant
@@ -122,9 +145,12 @@ app.get("/services/:serviceId/images", async (c) => {
 });
 
 // Get available dates for a service (dates that have schedules)
+// Optional query: service_variant_id — if set, use variant's duration
 app.get("/services/:serviceId/available-dates", async (c) => {
   const serviceId = parseInt(c.req.param("serviceId"));
-  
+  const variantIdParam = c.req.query("service_variant_id");
+  const variantId = variantIdParam ? parseInt(variantIdParam) : null;
+
   const service = await c.env.DB.prepare(
     "SELECT tenant_id, duration_minutes FROM services WHERE id = ? AND is_active = 1"
   )
@@ -133,6 +159,18 @@ app.get("/services/:serviceId/available-dates", async (c) => {
 
   if (!service) {
     return c.json({ error: "Servicio no encontrado" }, 404);
+  }
+
+  let durationMinutes = service.duration_minutes ?? 60;
+  if (variantId) {
+    const variant = await c.env.DB.prepare(
+      "SELECT duration_minutes FROM service_variants WHERE id = ? AND service_id = ?"
+    )
+      .bind(variantId, serviceId)
+      .first<{ duration_minutes: number | null }>();
+    if (variant && variant.duration_minutes != null) {
+      durationMinutes = variant.duration_minutes;
+    }
   }
 
   const today = new Date();
@@ -174,11 +212,13 @@ app.get("/services/:serviceId/available-dates", async (c) => {
       continue;
     }
 
-    // Check existing appointments for this tenant on this date
+    // Check existing appointments for this tenant on this date (effective duration from variant or service)
     const { results: appointments } = await c.env.DB.prepare(
-      `SELECT a.appointment_time, a.service_id, s.duration_minutes 
+      `SELECT a.appointment_time,
+              COALESCE(sv.duration_minutes, s.duration_minutes) as duration_minutes
        FROM appointments a
        JOIN services s ON a.service_id = s.id
+       LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
        WHERE a.tenant_id = ? AND a.appointment_date = ? AND a.status != 'cancelled'`
     )
       .bind(service.tenant_id, dateStr)
@@ -190,7 +230,7 @@ app.get("/services/:serviceId/available-dates", async (c) => {
     for (const schedule of schedules as any[]) {
       const scheduleStart = timeToMinutes(schedule.start_time);
       const scheduleEnd = timeToMinutes(schedule.end_time);
-      const duration = service.duration_minutes || 60;
+      const duration = durationMinutes;
       const slotInterval = 15; // 15 minute intervals
 
       for (let slotStart = scheduleStart; slotStart + duration <= scheduleEnd; slotStart += slotInterval) {
@@ -232,9 +272,12 @@ app.get("/services/:serviceId/available-dates", async (c) => {
 });
 
 // Get available time slots for a service on a specific date
+// Optional query: service_variant_id — if set, use variant's duration
 app.get("/services/:serviceId/slots", async (c) => {
   const serviceId = parseInt(c.req.param("serviceId"));
   const date = c.req.query("date");
+  const variantIdParam = c.req.query("service_variant_id");
+  const variantId = variantIdParam ? parseInt(variantIdParam) : null;
 
   if (!date) {
     return c.json({ error: "Fecha requerida" }, 400);
@@ -248,6 +291,18 @@ app.get("/services/:serviceId/slots", async (c) => {
 
   if (!service) {
     return c.json({ error: "Servicio no encontrado" }, 404);
+  }
+
+  let durationMinutes = service.duration_minutes ?? 60;
+  if (variantId) {
+    const variant = await c.env.DB.prepare(
+      "SELECT duration_minutes FROM service_variants WHERE id = ? AND service_id = ?"
+    )
+      .bind(variantId, serviceId)
+      .first<{ duration_minutes: number | null }>();
+    if (variant && variant.duration_minutes != null) {
+      durationMinutes = variant.duration_minutes;
+    }
   }
 
   const dateObj = new Date(date + "T00:00:00");
@@ -275,17 +330,20 @@ app.get("/services/:serviceId/slots", async (c) => {
     .bind(service.tenant_id, date, serviceId)
     .all();
 
-  // Get all existing appointments for this tenant on this date (shared resource scheduling)
+  // Get all existing appointments for this tenant on this date (shared resource scheduling; effective duration from variant or service)
   const { results: appointments } = await c.env.DB.prepare(
-    `SELECT a.appointment_time, a.service_id, s.duration_minutes, s.max_simultaneous_bookings
+    `SELECT a.appointment_time,
+            COALESCE(sv.duration_minutes, s.duration_minutes) as duration_minutes,
+            s.max_simultaneous_bookings
      FROM appointments a
      JOIN services s ON a.service_id = s.id
+     LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
      WHERE a.tenant_id = ? AND a.appointment_date = ? AND a.status != 'cancelled'`
   )
     .bind(service.tenant_id, date)
     .all();
 
-  const duration = service.duration_minutes || 60;
+  const duration = durationMinutes;
   const slotInterval = 15;
   const availableSlots: string[] = [];
 
@@ -375,6 +433,8 @@ app.post("/appointments", async (c) => {
     return c.json({ error: "Campos requeridos faltantes" }, 400);
   }
 
+  const serviceVariantId = body.service_variant_id != null ? parseInt(String(body.service_variant_id), 10) : null;
+
   // Get service details
   const service = await c.env.DB.prepare(
     "SELECT * FROM services WHERE id = ? AND is_active = 1"
@@ -391,9 +451,27 @@ app.post("/appointments", async (c) => {
     return c.json({ error: "Servicio no pertenece al negocio" }, 400);
   }
 
+  let effectivePrice: number | null = service.price;
+  let effectiveDuration = service.duration_minutes ?? 60;
+  let variantName: string | null = null;
+
+  if (serviceVariantId) {
+    const variant = await c.env.DB.prepare(
+      "SELECT * FROM service_variants WHERE id = ? AND service_id = ?"
+    )
+      .bind(serviceVariantId, body.service_id)
+      .first<{ price: number; duration_minutes: number | null; name: string }>();
+    if (!variant) {
+      return c.json({ error: "Variante no encontrada" }, 400);
+    }
+    effectivePrice = variant.price;
+    effectiveDuration = variant.duration_minutes ?? service.duration_minutes ?? 60;
+    variantName = variant.name;
+  }
+
   const date = body.appointment_date;
   const time = body.appointment_time;
-  const duration = service.duration_minutes || 60;
+  const duration = effectiveDuration;
 
   // Check schedule exceptions first (priority)
   const { results: exceptions } = await c.env.DB.prepare(
@@ -428,11 +506,14 @@ app.post("/appointments", async (c) => {
     return c.json({ error: "Este horario está bloqueado" }, 400);
   }
 
-  // Check for overlaps with existing appointments (shared resource scheduling)
+  // Check for overlaps with existing appointments (effective duration from variant or service)
   const { results: existingAppointments } = await c.env.DB.prepare(
-    `SELECT a.appointment_time, s.duration_minutes, s.max_simultaneous_bookings
+    `SELECT a.appointment_time,
+            COALESCE(sv.duration_minutes, s.duration_minutes) as duration_minutes,
+            s.max_simultaneous_bookings
      FROM appointments a
      JOIN services s ON a.service_id = s.id
+     LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
      WHERE a.tenant_id = ? AND a.appointment_date = ? AND a.status != 'cancelled'`
   )
     .bind(body.tenant_id, date)
@@ -463,14 +544,15 @@ app.post("/appointments", async (c) => {
   // Create appointment
   const result = await c.env.DB.prepare(
     `INSERT INTO appointments (
-      tenant_id, service_id, customer_name, customer_phone, customer_email,
+      tenant_id, service_id, service_variant_id, customer_name, customer_phone, customer_email,
       appointment_date, appointment_time, status, notes, payment_method,
       created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, datetime('now'), datetime('now'))`
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, datetime('now'), datetime('now'))`
   )
     .bind(
       body.tenant_id,
       body.service_id,
+      serviceVariantId,
       body.customer_name,
       body.customer_phone,
       body.customer_email || null,
@@ -518,12 +600,13 @@ app.post("/appointments", async (c) => {
       paymentMethodText = methodMap[body.payment_method] || body.payment_method;
     }
 
-    // Construct WhatsApp message
+    // Construct WhatsApp message (use effective price; service title + variant name if any)
+    const serviceTitleForMessage = variantName ? `${service.title} (${variantName})` : service.title;
     let message = `¡Hola ${businessConfig.business_name || "negocio"}! He reservado una cita desde su app. Estos son mis datos de reserva.\n\n`;
     message += `Nombre: ${body.customer_name}\n`;
-    message += `Servicio: ${service.title}\n`;
-    if (service.price) {
-      message += `Costo: $${service.price.toFixed(2)}\n`;
+    message += `Servicio: ${serviceTitleForMessage}\n`;
+    if (effectivePrice != null) {
+      message += `Costo: $${effectivePrice.toFixed(2)}\n`;
     }
     message += `Fecha: ${formattedDate} a las ${time} (click para guardar)\n`;
     if (paymentMethodText) {
@@ -549,13 +632,15 @@ app.get("/appointments/:id/ics", async (c) => {
     `SELECT 
       a.*,
       s.title as service_title,
-      s.duration_minutes,
-      s.price as service_price,
+      COALESCE(sv.duration_minutes, s.duration_minutes) as duration_minutes,
+      COALESCE(sv.price, s.price) as service_price,
+      sv.name as variant_name,
       bc.business_name,
       bc.address,
       bc.whatsapp
     FROM appointments a
     JOIN services s ON a.service_id = s.id
+    LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
     JOIN business_configs bc ON a.tenant_id = bc.tenant_id
     WHERE a.id = ?`
   )
@@ -569,6 +654,7 @@ app.get("/appointments/:id/ics", async (c) => {
       service_title: string;
       duration_minutes: number | null;
       service_price: number | null;
+      variant_name: string | null;
       business_name: string | null;
       address: string | null;
       payment_method: string | null;
@@ -598,7 +684,10 @@ app.get("/appointments/:id/ics", async (c) => {
     paymentMethodText = methodMap[appointmentDetails.payment_method] || appointmentDetails.payment_method;
   }
 
-  const description = `Servicio: ${appointmentDetails.service_title}\n`;
+  const serviceTitleDisplay = appointmentDetails.variant_name
+    ? `${appointmentDetails.service_title} (${appointmentDetails.variant_name})`
+    : appointmentDetails.service_title;
+  const description = `Servicio: ${serviceTitleDisplay}\n`;
   const description2 = `Cliente: ${appointmentDetails.customer_name}\n`;
   const description3 = appointmentDetails.service_price ? `Costo: $${appointmentDetails.service_price.toFixed(2)}\n` : "";
   const description4 = paymentMethodText ? `Método de pago: ${paymentMethodText}\n` : "";
@@ -606,7 +695,7 @@ app.get("/appointments/:id/ics", async (c) => {
   const description6 = appointmentDetails.customer_email ? `Email: ${appointmentDetails.customer_email}` : "";
 
   const icsContent = generateICS({
-    title: `${appointmentDetails.service_title} - ${appointmentDetails.business_name || "Cita"}`,
+    title: `${serviceTitleDisplay} - ${appointmentDetails.business_name || "Cita"}`,
     description: description + description2 + description3 + description4 + description5 + description6,
     location: appointmentDetails.address || undefined,
     startDate,

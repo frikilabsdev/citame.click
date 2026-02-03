@@ -38,16 +38,18 @@ export default function DashboardServicesPage() {
     }
   };
 
-  const fetchServices = async () => {
+  const fetchServices = async (): Promise<Service[] | void> => {
     if (!selectedTenant) return;
 
     try {
       const response = await fetch(
-        `/api/services?tenant_id=${selectedTenant}`
+        `/api/services?tenant_id=${selectedTenant}`,
+        { credentials: "include" }
       );
       if (response.ok) {
         const data = await response.json();
         setServices(data);
+        return data;
       }
     } catch (error) {
       console.error("Error al cargar servicios:", error);
@@ -283,6 +285,13 @@ export default function DashboardServicesPage() {
           onSave={editingService ? handleUpdateService : handleCreateService}
           service={editingService}
           tenantId={selectedTenant}
+          onVariantChange={async () => {
+            const list = await fetchServices();
+            if (list && editingService) {
+              const updated = list.find((s) => s.id === editingService.id);
+              if (updated) setEditingService(updated);
+            }
+          }}
         />
       )}
     </div>
