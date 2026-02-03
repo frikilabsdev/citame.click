@@ -541,79 +541,7 @@ export default function ServiceModal({
             </p>
           </div>
 
-          {/* Additional Images */}
-          {service && (
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">
-                Imágenes Adicionales
-              </label>
-              <p className="text-xs text-slate-500 mb-3">
-                Estas imágenes se mostrarán en el modal de detalles del servicio (galería)
-              </p>
-              <input
-                type="file"
-                ref={additionalImagesInputRef}
-                accept="image/jpeg,image/jpg,image/png,image/webp"
-                multiple
-                onChange={(e) => {
-                  const files = e.target.files;
-                  if (files && files.length > 0) {
-                    handleAdditionalImagesUpload(files);
-                  }
-                }}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => additionalImagesInputRef.current?.click()}
-                disabled={uploadingAdditionalImages.size > 0}
-                className="flex items-center space-x-2 px-4 py-3 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50"
-              >
-                {uploadingAdditionalImages.size > 0 ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                    <span className="text-slate-700">Subiendo imágenes...</span>
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon className="w-5 h-5 text-slate-600" />
-                    <span className="text-slate-700">Agregar Imágenes Adicionales</span>
-                  </>
-                )}
-              </button>
-
-              {additionalImages.length > 0 && (
-                <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
-                  {additionalImages.map((image) => (
-                    <div key={image.id} className="relative group">
-                      <img
-                        src={image.image_url}
-                        alt={`Imagen ${image.id}`}
-                        className="w-full h-24 object-cover rounded-lg border border-slate-200"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteAdditionalImage(image.id)}
-                        className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {!service && (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <p className="text-sm text-blue-800">
-                <strong>Nota:</strong> Para agregar imágenes adicionales, primero guarda el servicio y luego edítalo.
-              </p>
-            </div>
-          )}
-
-          {/* Variantes (ej. Corte mujer/hombre/niño con precios distintos) */}
+          {/* Variantes (ej. Corte mujer/hombre/niño con precios distintos) - solo al editar */}
           {service?.id && (
             <div className="border-t border-slate-200 pt-6">
               <label className="block text-sm font-semibold text-slate-700 mb-2">
@@ -683,6 +611,78 @@ export default function ServiceModal({
                   Añadir opción
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Additional Images */}
+          {service && (
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Imágenes Adicionales
+              </label>
+              <p className="text-xs text-slate-500 mb-3">
+                Estas imágenes se mostrarán en el modal de detalles del servicio (galería)
+              </p>
+              <input
+                type="file"
+                ref={additionalImagesInputRef}
+                accept="image/jpeg,image/jpg,image/png,image/webp"
+                multiple
+                onChange={(e) => {
+                  const files = e.target.files;
+                  if (files && files.length > 0) {
+                    handleAdditionalImagesUpload(files);
+                  }
+                }}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => additionalImagesInputRef.current?.click()}
+                disabled={uploadingAdditionalImages.size > 0}
+                className="flex items-center space-x-2 px-4 py-3 border-2 border-dashed border-slate-300 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50"
+              >
+                {uploadingAdditionalImages.size > 0 ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                    <span className="text-slate-700">Subiendo imágenes...</span>
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon className="w-5 h-5 text-slate-600" />
+                    <span className="text-slate-700">Agregar Imágenes Adicionales</span>
+                  </>
+                )}
+              </button>
+
+              {additionalImages.length > 0 && (
+                <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {additionalImages.map((image) => (
+                    <div key={image.id} className="relative group">
+                      <img
+                        src={image.image_url}
+                        alt={`Imagen ${image.id}`}
+                        className="w-full h-24 object-cover rounded-lg border border-slate-200"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteAdditionalImage(image.id)}
+                        className="absolute top-1 right-1 p-1 bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!service && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <p className="text-sm text-blue-800">
+                <strong>Nota:</strong> Para agregar imágenes adicionales, primero guarda el servicio y luego edítalo.
+              </p>
             </div>
           )}
 

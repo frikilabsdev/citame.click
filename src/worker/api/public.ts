@@ -86,18 +86,21 @@ app.get("/tenants/:slug/services", async (c) => {
     return c.json([]);
   }
 
-  const ids = services.map((s) => s.id);
-  const placeholders = ids.map(() => "?").join(",");
-  const { results: variants } = await c.env.DB.prepare(
-    `SELECT * FROM service_variants WHERE service_id IN (${placeholders}) ORDER BY service_id, display_order ASC, id ASC`
-  )
-    .bind(...ids)
-    .all<{ id: number; service_id: number; name: string; price: number; duration_minutes: number | null; display_order: number }>();
-
-  const variantsByServiceId: Record<number, typeof variants> = {};
-  for (const v of variants || []) {
-    if (!variantsByServiceId[v.service_id]) variantsByServiceId[v.service_id] = [];
-    variantsByServiceId[v.service_id].push(v);
+  let variantsByServiceId: Record<number, { id: number; service_id: number; name: string; price: number; duration_minutes: number | null; display_order: number }[]> = {};
+  try {
+    const ids = services.map((s) => s.id);
+    const placeholders = ids.map(() => "?").join(",");
+    const { results: variants } = await c.env.DB.prepare(
+      `SELECT * FROM service_variants WHERE service_id IN (${placeholders}) ORDER BY service_id, display_order ASC, id ASC`
+    )
+      .bind(...ids)
+      .all<{ id: number; service_id: number; name: string; price: number; duration_minutes: number | null; display_order: number }>();
+    for (const v of variants || []) {
+      if (!variantsByServiceId[v.service_id]) variantsByServiceId[v.service_id] = [];
+      variantsByServiceId[v.service_id].push(v);
+    }
+  } catch {
+    // Tabla service_variants puede no existir si no se aplicó la migración 6
   }
 
   const servicesWithVariants = services.map((s) => ({

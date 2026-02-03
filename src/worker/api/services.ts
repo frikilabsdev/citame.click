@@ -82,19 +82,22 @@ servicesApi.get("/", authMiddleware, async (c) => {
     return c.json([]);
   }
 
-  const ids = services.map((s) => s.id as number);
-  const placeholders = ids.map(() => "?").join(",");
-  const { results: variants } = await c.env.DB.prepare(
-    `SELECT * FROM service_variants WHERE service_id IN (${placeholders}) ORDER BY service_id, display_order ASC, id ASC`
-  )
-    .bind(...ids)
-    .all<Record<string, unknown>>();
-
-  const variantsByServiceId: Record<number, Record<string, unknown>[]> = {};
-  for (const v of variants || []) {
-    const sid = v.service_id as number;
-    if (!variantsByServiceId[sid]) variantsByServiceId[sid] = [];
-    variantsByServiceId[sid].push(v);
+  let variantsByServiceId: Record<number, Record<string, unknown>[]> = {};
+  try {
+    const ids = services.map((s) => s.id as number);
+    const placeholders = ids.map(() => "?").join(",");
+    const { results: variants } = await c.env.DB.prepare(
+      `SELECT * FROM service_variants WHERE service_id IN (${placeholders}) ORDER BY service_id, display_order ASC, id ASC`
+    )
+      .bind(...ids)
+      .all<Record<string, unknown>>();
+    for (const v of variants || []) {
+      const sid = v.service_id as number;
+      if (!variantsByServiceId[sid]) variantsByServiceId[sid] = [];
+      variantsByServiceId[sid].push(v);
+    }
+  } catch {
+    // Tabla service_variants puede no existir si no se aplicó la migración 6
   }
 
   const servicesWithVariants = services.map((s) => ({
@@ -128,11 +131,17 @@ servicesApi.get("/:id", authMiddleware, async (c) => {
     return c.json({ error: "No tienes acceso a este servicio" }, 403);
   }
 
-  const { results: variants } = await c.env.DB.prepare(
-    "SELECT * FROM service_variants WHERE service_id = ? ORDER BY display_order ASC, id ASC"
-  )
-    .bind(serviceId)
-    .all();
+  let variants: Record<string, unknown>[] | undefined;
+  try {
+    const r = await c.env.DB.prepare(
+      "SELECT * FROM service_variants WHERE service_id = ? ORDER BY display_order ASC, id ASC"
+    )
+      .bind(serviceId)
+      .all<Record<string, unknown>>();
+    variants = r.results;
+  } catch {
+    variants = [];
+  }
 
   return c.json({ ...service, variants: variants || [] });
 });
