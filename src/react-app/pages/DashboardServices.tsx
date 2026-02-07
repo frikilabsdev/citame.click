@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, Clock, DollarSign, Users, Search, Package } from "lucide-react";
+import { Plus, Edit2, Trash2, Clock, DollarSign, Users, Package } from "lucide-react";
 import ServiceModal from "@/react-app/components/ServiceModal";
 import type { Service, Tenant } from "@/shared/types";
 
@@ -235,7 +235,7 @@ export default function DashboardServicesPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-4">
-                  {service.price !== undefined && (
+                  {typeof service.price === 'number' && (
                     <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-100 text-sm font-semibold text-slate-700">
                       <DollarSign className="w-4 h-4 text-emerald-500" />
                       ${service.price.toFixed(2)}
