@@ -831,29 +831,46 @@ app.post("/appointments", async (c) => {
     "SELECT * FROM appointments WHERE id = ?"
   )
     .bind(result.meta.last_row_id)
-    .first();
+    .first() as Record<string, unknown> | null;
 
-  // Get business config for WhatsApp message
+  if (!appointment) {
+    return c.json({ error: "Error al crear la cita", message: "No se pudo recuperar la cita creada" }, 500);
+  }
+
+  // Get employee name if appointment has employee_id
+  let employeeName: string | null = null;
+  const appointmentEmployeeId = appointment.employee_id as number | null | undefined;
+  if (appointmentEmployeeId) {
+    try {
+      const emp = await c.env.DB.prepare("SELECT name FROM employees WHERE id = ?")
+        .bind(appointmentEmployeeId)
+        .first<{ name: string }>();
+      if (emp?.name) employeeName = emp.name;
+    } catch {
+      // ignore
+    }
+  }
+
+  // Get business config for WhatsApp messages
   const businessConfig = await c.env.DB.prepare(
     "SELECT business_name, whatsapp FROM business_configs WHERE tenant_id = ?"
   )
     .bind(body.tenant_id)
     .first<{ business_name: string | null; whatsapp: string | null }>();
 
-  // Generate WhatsApp message
-  let whatsappUrl: string | null = null;
+  const dateObj = new Date(date + "T00:00:00");
+  const formattedDate = dateObj.toLocaleDateString("es-MX", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const serviceTitleForMessage = variantName ? `${service.title} (${variantName})` : service.title;
 
+  // WhatsApp to business (notify the business of the booking)
+  let whatsappUrl: string | null = null;
   if (businessConfig?.whatsapp) {
     const whatsappNumber = businessConfig.whatsapp.replace(/[^0-9]/g, "");
-    const dateObj = new Date(date + "T00:00:00");
-    const formattedDate = dateObj.toLocaleDateString("es-MX", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-
-    // Get payment method name
     let paymentMethodText = "";
     if (body.payment_method) {
       const methodMap: { [key: string]: string } = {
@@ -863,28 +880,41 @@ app.post("/appointments", async (c) => {
       };
       paymentMethodText = methodMap[body.payment_method] || body.payment_method;
     }
+    let messageToBusiness = `¡Hola ${businessConfig.business_name || "negocio"}! He reservado una cita desde su app. Estos son mis datos de reserva.\n\n`;
+    messageToBusiness += `Nombre: ${body.customer_name}\n`;
+    messageToBusiness += `Servicio: ${serviceTitleForMessage}\n`;
+    if (employeeName) messageToBusiness += `Con: ${employeeName}\n`;
+    if (effectivePrice != null) messageToBusiness += `Costo: $${effectivePrice.toFixed(2)}\n`;
+    messageToBusiness += `Fecha: ${formattedDate} a las ${time}\n`;
+    if (paymentMethodText) messageToBusiness += `Método de pago: ${paymentMethodText}\n`;
+    messageToBusiness += `\nPor favor, podrías confirmar mi cita. ¡Gracias!`;
+    whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(messageToBusiness)}`;
+  }
 
-    // Construct WhatsApp message (use effective price; service title + variant name if any)
-    const serviceTitleForMessage = variantName ? `${service.title} (${variantName})` : service.title;
-    let message = `¡Hola ${businessConfig.business_name || "negocio"}! He reservado una cita desde su app. Estos son mis datos de reserva.\n\n`;
-    message += `Nombre: ${body.customer_name}\n`;
-    message += `Servicio: ${serviceTitleForMessage}\n`;
-    if (effectivePrice != null) {
-      message += `Costo: $${effectivePrice.toFixed(2)}\n`;
-    }
-    message += `Fecha: ${formattedDate} a las ${time} (click para guardar)\n`;
-    if (paymentMethodText) {
-      message += `Metodo de pago: ${paymentMethodText}\n`;
-    }
-    message += `\nPor favor, podrías confirmar mi cita. Gracias!!`;
-
-    const encodedMessage = encodeURIComponent(message);
-    whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodedMessage}`;
+  // WhatsApp to customer: link to send confirmation to the phone number they entered
+  let whatsappConfirmationToCustomer: string | null = null;
+  const customerPhone = body.customer_phone ? String(body.customer_phone).replace(/[^0-9]/g, "") : "";
+  if (customerPhone.length >= 10) {
+    const phoneForWa = customerPhone.length === 10 ? `52${customerPhone}` : customerPhone;
+    const confirmationMessage = [
+      `✅ *Reserva confirmada*`,
+      ``,
+      `Servicio: ${serviceTitleForMessage}`,
+      employeeName ? `Con: ${employeeName}` : null,
+      `Fecha: ${formattedDate}`,
+      `Hora: ${time}`,
+      effectivePrice != null ? `Costo: $${effectivePrice.toFixed(2)}` : null,
+      ``,
+      `${businessConfig?.business_name || "El negocio"} te confirmará tu cita.`,
+    ].filter(Boolean).join("\n");
+    whatsappConfirmationToCustomer = `https://wa.me/${phoneForWa}?text=${encodeURIComponent(confirmationMessage)}`;
   }
 
   return c.json({
     ...appointment,
+    employee_name: employeeName,
     whatsapp_url: whatsappUrl,
+    whatsapp_confirmation_to_customer: whatsappConfirmationToCustomer,
   }, 201);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

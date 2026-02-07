@@ -17,39 +17,50 @@ app.get("/", authMiddleware, async (c) => {
     return c.json({ error: "No autenticado" }, 401);
   }
 
+  if (!c.env.DB) {
+    return c.json({ error: "Error al cargar citas", message: "Base de datos no configurada" }, 500);
+  }
+
   const status = c.req.query("status");
-  const tenantId = c.req.query("tenant_id");
+  const tenantIdParam = c.req.query("tenant_id");
+  const tenantId = tenantIdParam ? parseInt(tenantIdParam, 10) : null;
+  const params: (string | number)[] = [user.id];
 
-  let query = `
-    SELECT 
-      a.*,
-      s.title as service_title,
-      sv.name as service_variant_name
-    FROM appointments a
-    JOIN services s ON a.service_id = s.id
-    LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
-    JOIN tenants t ON a.tenant_id = t.id
-    WHERE t.owner_user_id = ?
-  `;
-  const params: any[] = [user.id];
+  const baseWhere = "t.owner_user_id = ?";
+  const statusCond = status ? " AND a.status = ?" : "";
+  const tenantCond = tenantId != null && !isNaN(tenantId) ? " AND a.tenant_id = ?" : "";
+  if (status) params.push(status);
+  if (tenantId != null && !isNaN(tenantId)) params.push(tenantId);
+  const order = " ORDER BY a.appointment_date DESC, a.appointment_time DESC";
 
-  if (status) {
-    query += " AND a.status = ?";
-    params.push(status);
+  try {
+    // Query with service_variant_name (requires service_variant_id column and service_variants table)
+    const queryWithVariant = `
+      SELECT a.*, s.title as service_title, sv.name as service_variant_name
+      FROM appointments a
+      JOIN services s ON a.service_id = s.id
+      LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
+      JOIN tenants t ON a.tenant_id = t.id
+      WHERE ${baseWhere}${statusCond}${tenantCond}${order}`;
+    const result = await c.env.DB.prepare(queryWithVariant).bind(...params).all<AppointmentWithService>();
+    return c.json(result.results ?? []);
+  } catch {
+    // Fallback when service_variant_id or service_variants doesn't exist (e.g. migration 6 not applied)
+    try {
+      const queryFallback = `
+        SELECT a.*, s.title as service_title, NULL as service_variant_name
+        FROM appointments a
+        JOIN services s ON a.service_id = s.id
+        JOIN tenants t ON a.tenant_id = t.id
+        WHERE ${baseWhere}${statusCond}${tenantCond}${order}`;
+      const result = await c.env.DB.prepare(queryFallback).bind(...params).all<AppointmentWithService>();
+      return c.json(result.results ?? []);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("appointments GET list error", err);
+      return c.json({ error: "Error al cargar citas", message: msg }, 500);
+    }
   }
-
-  if (tenantId) {
-    query += " AND a.tenant_id = ?";
-    params.push(parseInt(tenantId));
-  }
-
-  query += " ORDER BY a.appointment_date DESC, a.appointment_time DESC";
-
-  const { results } = await c.env.DB.prepare(query)
-    .bind(...params)
-    .all<AppointmentWithService>();
-
-  return c.json(results);
 });
 
 // Get a specific appointment
@@ -59,18 +70,37 @@ app.get("/:id", authMiddleware, async (c) => {
     return c.json({ error: "No autenticado" }, 401);
   }
 
-  const appointmentId = parseInt(c.req.param("id"));
+  if (!c.env.DB) {
+    return c.json({ error: "Error al cargar la cita", message: "Base de datos no configurada" }, 500);
+  }
+
+  const appointmentId = parseInt(c.req.param("id"), 10);
+  if (isNaN(appointmentId)) {
+    return c.json({ error: "ID inválido" }, 400);
+  }
+
+  try {
+    const appointment = await c.env.DB.prepare(
+      `SELECT a.*, s.title as service_title, sv.name as service_variant_name
+       FROM appointments a
+       JOIN services s ON a.service_id = s.id
+       LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
+       JOIN tenants t ON a.tenant_id = t.id
+       WHERE a.id = ? AND t.owner_user_id = ?`
+    )
+      .bind(appointmentId, user.id)
+      .first<AppointmentWithService>();
+    if (appointment) return c.json(appointment);
+  } catch {
+    // fallback without service_variants
+  }
 
   const appointment = await c.env.DB.prepare(
-    `SELECT 
-      a.*,
-      s.title as service_title,
-      sv.name as service_variant_name
-    FROM appointments a
-    JOIN services s ON a.service_id = s.id
-    LEFT JOIN service_variants sv ON a.service_variant_id = sv.id
-    JOIN tenants t ON a.tenant_id = t.id
-    WHERE a.id = ? AND t.owner_user_id = ?`
+    `SELECT a.*, s.title as service_title, NULL as service_variant_name
+     FROM appointments a
+     JOIN services s ON a.service_id = s.id
+     JOIN tenants t ON a.tenant_id = t.id
+     WHERE a.id = ? AND t.owner_user_id = ?`
   )
     .bind(appointmentId, user.id)
     .first<AppointmentWithService>();

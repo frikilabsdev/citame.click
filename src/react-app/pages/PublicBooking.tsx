@@ -55,6 +55,8 @@ export default function PublicBookingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingComplete, setBookingComplete] = useState(false);
   const [whatsappUrl, setWhatsappUrl] = useState<string | null>(null);
+  const [whatsappConfirmationToCustomer, setWhatsappConfirmationToCustomer] = useState<string | null>(null);
+  const [bookingEmployeeName, setBookingEmployeeName] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [detailModalService, setDetailModalService] = useState<Service | null>(null);
   const [serviceSearchQuery, setServiceSearchQuery] = useState("");
@@ -108,6 +110,15 @@ export default function PublicBookingPage() {
       setCurrentMonth(new Date());
     }
   }, [selectedService, selectedVariant, selectedEmployee]);
+
+  // Abrir WhatsApp al negocio al mostrar la confirmación (si hay enlace)
+  useEffect(() => {
+    if (!bookingComplete || !whatsappUrl) return;
+    const t = setTimeout(() => {
+      window.open(whatsappUrl!, "_blank", "noopener,noreferrer");
+    }, 800);
+    return () => clearTimeout(t);
+  }, [bookingComplete, whatsappUrl]);
 
   useEffect(() => {
     if (selectedService && selectedDate) {
@@ -286,15 +297,10 @@ export default function PublicBookingPage() {
       if (response.ok) {
         const data = await response.json();
         setBookingComplete(true);
-        
-        // Open WhatsApp automatically if URL is provided
-        if (data.whatsapp_url) {
-          setWhatsappUrl(data.whatsapp_url);
-          // Open WhatsApp in a new window after 1.5 seconds
-          setTimeout(() => {
-            window.open(data.whatsapp_url, "_blank");
-          }, 1500);
-        }
+        setWhatsappUrl(data.whatsapp_url ?? null);
+        setWhatsappConfirmationToCustomer(data.whatsapp_confirmation_to_customer ?? null);
+        setBookingEmployeeName(data.employee_name ?? null);
+        // WhatsApp se abre en el useEffect al mostrar la pantalla de confirmación
       } else {
         const errorData = await response.json().catch(() => ({}));
         const msg = errorData?.message || errorData?.error || `Error ${response.status} al crear la cita`;
@@ -310,6 +316,9 @@ export default function PublicBookingPage() {
 
   const resetBooking = () => {
     setBookingComplete(false);
+    setWhatsappUrl(null);
+    setWhatsappConfirmationToCustomer(null);
+    setBookingEmployeeName(null);
     setSelectedService(null);
     setSelectedVariant(null);
     setSelectedEmployee(null);
@@ -437,7 +446,7 @@ export default function PublicBookingPage() {
           </p>
 
           <div 
-            className="rounded-xl p-4 mb-6 text-left"
+            className="rounded-xl p-4 mb-4 text-left"
             style={{
               backgroundColor: `${primaryColor}10`,
               borderColor: `${primaryColor}30`,
@@ -449,7 +458,14 @@ export default function PublicBookingPage() {
               <div>
                 <span className="font-semibold">Servicio:</span>{" "}
                 {selectedService?.title}
+                {selectedVariant?.name && ` (${selectedVariant.name})`}
               </div>
+              {bookingEmployeeName && (
+                <div>
+                  <span className="font-semibold">Con:</span>{" "}
+                  {bookingEmployeeName}
+                </div>
+              )}
               <div>
                 <span className="font-semibold">Fecha:</span>{" "}
                 {new Date(selectedDate + "T00:00:00").toLocaleDateString("es-MX", {
@@ -466,19 +482,48 @@ export default function PublicBookingPage() {
             </div>
           </div>
 
-          {whatsappUrl && (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
-              <p className="text-sm text-green-800 mb-2 flex items-center justify-center space-x-2">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <span>Tu mensaje de confirmación se está enviando por WhatsApp</span>
+          {/* Siempre mostrar sección de WhatsApp: enlace al negocio o aviso */}
+          <div className="mb-4">
+            {whatsappUrl ? (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-green-800 mb-3 flex items-center justify-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  Envía tu reserva al negocio por WhatsApp
+                </p>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center w-full px-5 py-3 bg-green-600 text-white font-semibold rounded-xl hover:bg-green-700 transition-colors shadow-md"
+                >
+                  Abrir WhatsApp y enviar datos de mi cita
+                </a>
+                <p className="text-xs text-green-700 mt-2 text-center">
+                  Se abrirá WhatsApp con un mensaje listo para enviar al negocio.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <p className="text-sm text-amber-800 text-center">
+                  El negocio no tiene WhatsApp configurado. Contacta por teléfono o asiste el día de tu cita con estos datos.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {whatsappConfirmationToCustomer && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+              <p className="text-sm text-blue-800 mb-2 flex items-center justify-center space-x-2">
+                <CheckCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
+                <span>Guardar confirmación en tu WhatsApp</span>
               </p>
               <a
-                href={whatsappUrl}
+                href={whatsappConfirmationToCustomer}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-green-700 underline hover:text-green-900 block mt-2"
+                className="inline-flex items-center justify-center w-full px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Si no se abrió automáticamente, haz clic aquí
+                Enviar confirmación al número que registraste
               </a>
             </div>
           )}

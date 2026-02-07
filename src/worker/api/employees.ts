@@ -407,6 +407,15 @@ app.post(
       return c.json(row ?? { id: rowId, employee_id: id, ...data }, 201);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      const isUniqueViolation =
+        /UNIQUE constraint failed.*employee_schedules/i.test(msg) ||
+        /SQLITE_CONSTRAINT.*UNIQUE/i.test(msg);
+      if (isUniqueViolation) {
+        return c.json(
+          { error: "Ya existe un horario con el mismo día y franja para este empleado" },
+          400
+        );
+      }
       logger.error("POST /api/employees/:id/schedules", err, { path: c.req.path });
       return c.json({ error: "Error al crear horario", message: msg }, 500);
     }

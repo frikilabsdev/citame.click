@@ -64,7 +64,24 @@ Con eso, el workflow **Deploy to Cloudflare Workers** podrá autenticarse en Clo
 
 Si algún paso falla, el deploy no se realiza y puedes ver el error en la pestaña Actions del repositorio.
 
-**Importante:** El deploy **solo actualiza el Worker** (código y assets). **No aplica migraciones de D1**. Si añades nuevas tablas o columnas (p. ej. migración 7), debes ejecutarlas tú en la D1 remota (ver sección “Aplicar la migración 7” más abajo). Sin eso, la API puede devolver 500 en producción aunque el código esté desplegado.
+**Importante:** El deploy **solo actualiza el Worker** (código y assets). **No aplica migraciones de D1**. Si en producción faltan tablas o columnas (500, "no such column", "no such table"), debes sincronizar la D1 remota (ver más abajo).
+
+## Sincronizar D1 remota cuando faltan tablas o columnas
+
+Si en producción muchas tablas o columnas no existen en D1, aplica el script de sincronización (idempotente; puedes ejecutarlo varias veces):
+
+1. **Si la base D1 estaba vacía**, aplica primero la migración base:
+   ```bash
+   npx wrangler d1 execute mocha-appointments-db --remote --file=migrations/1.sql
+   ```
+
+2. **Luego aplica toda la sincronización** (tablas y columnas de migraciones 2–7):
+   ```bash
+   chmod +x scripts/apply-sync-d1-remote.sh
+   ./scripts/apply-sync-d1-remote.sh
+   ```
+
+   El script ejecuta en orden los archivos de `migrations/sync-d1-remote/`. Si un paso falla con "duplicate column" o "table already exists", es que ya estaba aplicado y continúa con el siguiente. Ver `migrations/sync-d1-remote/README.md` para más detalle.
 
 ## Deploy manual desde GitHub
 

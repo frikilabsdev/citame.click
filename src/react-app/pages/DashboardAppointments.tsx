@@ -47,6 +47,7 @@ export default function DashboardAppointmentsPage() {
   const [uncancelReason, setUncancelReason] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -67,15 +68,25 @@ export default function DashboardAppointmentsPage() {
   }, [statusFilter, appointments]);
 
   const fetchAppointments = async () => {
+    setLoadError(null);
     try {
       const response = await fetch("/api/appointments");
       if (response.ok) {
         const data = await response.json();
-        setAppointments(data);
-        setFilteredAppointments(data);
+        setAppointments(Array.isArray(data) ? data : []);
+        setFilteredAppointments(Array.isArray(data) ? data : []);
+      } else {
+        const body = await response.json().catch(() => ({}));
+        const msg = body?.message || body?.error || `Error ${response.status} al cargar citas`;
+        setLoadError(msg);
+        setAppointments([]);
+        setFilteredAppointments([]);
       }
-    } catch (error) {
-      console.error("Error al cargar citas:", error);
+    } catch (err) {
+      console.error("Error al cargar citas:", err);
+      setLoadError("No se pudieron cargar las citas. Intenta de nuevo.");
+      setAppointments([]);
+      setFilteredAppointments([]);
     } finally {
       setIsLoading(false);
     }
@@ -228,6 +239,19 @@ export default function DashboardAppointmentsPage() {
           </p>
         </div>
       </div>
+
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center justify-between gap-4">
+          <p className="text-red-800 text-sm">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => { setIsLoading(true); fetchAppointments(); }}
+            className="px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 whitespace-nowrap"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
